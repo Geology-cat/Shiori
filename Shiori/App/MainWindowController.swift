@@ -50,7 +50,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     // アプリを切り替えたら保存しておく（他のアプリで開いたときに古い内容を見せない）
     func windowDidResignMain(_ notification: Notification) {
         if let tab = workspace.activeTab, tab.isDirty, AppSettings.shared.autosave, tab.url != nil {
-            try? tab.save()
+            _ = try? tab.save()
         }
     }
 }
