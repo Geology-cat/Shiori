@@ -99,11 +99,12 @@ final class FileTreeModel: ObservableObject {
 
     /// 指定ファイルが見えるよう親フォルダを開く
     func reveal(_ url: URL) {
-        guard let root else { return }
+        guard let root = root?.standardizedFileURL else { return }
+        let target = url.standardizedFileURL
         let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
-        guard url.path.hasPrefix(rootPath) else { return }
+        guard target.path.hasPrefix(rootPath) else { return }
         var changed = false
-        var dir = url.deletingLastPathComponent()
+        var dir = target.deletingLastPathComponent()
         while dir.path.count > root.path.count {
             if expanded.insert(dir.path).inserted { changed = true }
             dir = dir.deletingLastPathComponent()
@@ -168,10 +169,9 @@ final class FileIndex {
         let q = query.lowercased()
         guard !q.isEmpty else { return Array(files.prefix(limit)) }
         var scored: [(URL, Int)] = []
-        let rootCount = (root?.path.count ?? 0) + 1
         for url in files {
             let name = url.lastPathComponent.lowercased()
-            let relative = String(url.path.dropFirst(min(rootCount, url.path.count))).lowercased()
+            let relative = root.map { MarkdownEditing.relativePath(from: $0, to: url) }?.lowercased() ?? url.path.lowercased()
             if let score = Self.score(query: q, target: name) {
                 scored.append((url, score))
             } else if let score = Self.score(query: q, target: relative) {

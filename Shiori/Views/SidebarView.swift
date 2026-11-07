@@ -95,7 +95,12 @@ private struct FilesPanel: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(tree.rows) { row in
-                    FileRowView(workspace: workspace, tree: tree, row: row)
+                    FileRowView(
+                        workspace: workspace,
+                        tree: tree,
+                        row: row,
+                        isActive: workspace.activeTab?.url?.standardizedFileURL == row.url.standardizedFileURL
+                    )
                 }
             }
             .padding(.horizontal, 6)
@@ -149,12 +154,9 @@ private struct FileRowView: View {
     let workspace: WorkspaceModel
     let tree: FileTreeModel
     let row: FileRow
+    let isActive: Bool
     @State private var isHovering = false
     @State private var isDropTarget = false
-
-    private var isActive: Bool {
-        workspace.activeTab?.url?.standardizedFileURL == row.url.standardizedFileURL
-    }
 
     var body: some View {
         HStack(spacing: 4) {
@@ -316,8 +318,8 @@ private struct FilterResultRow: View {
 
     private var relativeDirectory: String {
         guard let root = workspace.rootURL else { return url.deletingLastPathComponent().path }
-        let dir = url.deletingLastPathComponent().path
-        return dir.count > root.path.count ? String(dir.dropFirst(root.path.count + 1)) : "/"
+        let relative = MarkdownEditing.relativePath(from: root, to: url.deletingLastPathComponent())
+        return relative.isEmpty ? "/" : relative
     }
 }
 

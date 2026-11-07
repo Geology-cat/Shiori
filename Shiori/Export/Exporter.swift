@@ -1,4 +1,5 @@
 import AppKit
+import PDFKit
 import WebKit
 
 /// PDF・HTML の書き出しと印刷。
@@ -116,6 +117,8 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
         await Shiori.render(p);
         await Promise.all(Array.from(document.images).map((img) => img.complete ? null : img.decode().catch(() => null)));
         await document.fonts.ready;
+        // 紙には開閉がないので、折りたたみはすべて開いておく
+        document.querySelectorAll('#content details').forEach((d) => { d.open = true; });
         return Shiori.exportDocument();
         """
         webView.callAsyncJavaScript(script, arguments: ["s": settings, "p": params], in: nil, in: .page) { [weak self] result in
@@ -128,12 +131,107 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
                 case .html(let url):
                     self.writeHTML(value as? [String: Any] ?? [:], to: url)
                 case .pdf(let url):
-                    self.writePDF(to: url)
+                    if self.isVertical {
+                        self.composeVerticalPDF { result in
+                            switch result {
+                            case .success(let document):
+                                self.finish(document.write(to: url) ? nil : CocoaError(.fileWriteUnknown))
+                            case .failure(let error):
+                                self.finish(error)
+                            }
+                        }
+                    } else {
+                        self.writePDF(to: url)
+                    }
                 case .print:
-                    self.showPrintPanel()
+                    if self.isVertical {
+                        self.composeVerticalPDF { result in
+                            switch result {
+                            case .success(let document): self.showPrintPanel(for: document)
+                            case .failure(let error): self.finish(error)
+                            }
+                        }
+                    } else {
+                        self.showPrintPanel()
+                    }
                 }
             }
         }
+    }
+
+    private var isVertical: Bool { (settings["writing"] as? String) == "vertical" }
+
+    // MARK: - 縦書きの PDF
+
+    /// A4 の用紙（pt）と余白
+    private static let pageSize = NSSize(width: 595.28, height: 841.89)
+    private static let pageMargin: CGFloat = 40
+
+    /// WebKit の印刷は縦書きを横方向に分割できないので、1 ページずつ取り込んで PDF を組み立てる。
+    /// 取り込みはベクターのままなので、文字は選択や検索ができる。
+    private func composeVerticalPDF(completion: @escaping (Result<PDFDocument, Error>) -> Void) {
+        let scale = Self.pageSize.width / webView.bounds.width
+        let pageWidth = (Self.pageSize.width - Self.pageMargin * 2) / scale
+        webView.callAsyncJavaScript(
+            "Shiori.setExporting(true); return Shiori.verticalPageSlices(w);",
+            arguments: ["w": pageWidth], in: nil, in: .page
+        ) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success(let value):
+                let slices = (value as? [[String: Any]] ?? []).compactMap { item -> (start: CGFloat, end: CGFloat)? in
+                    guard let start = (item["start"] as? NSNumber)?.doubleValue, let end = (item["end"] as? NSNumber)?.doubleValue else { return nil }
+                    return (CGFloat(start), CGFloat(end))
+                }
+                self.capture(slices, index: 0, scale: scale, into: PDFDocument(), completion: completion)
+            }
+        }
+    }
+
+    /// 本文を横へずらしながら 1 ページずつ取り込む
+    private func capture(_ slices: [(start: CGFloat, end: CGFloat)], index: Int, scale: CGFloat, into document: PDFDocument,
+                         completion: @escaping (Result<PDFDocument, Error>) -> Void) {
+        guard index < slices.count else {
+            completion(.success(document))
+            return
+        }
+        let slice = slices[index]
+        webView.callAsyncJavaScript("await Shiori.shiftForExport(s); return true;", arguments: ["s": slice.start], in: nil, in: .page) { [weak self] _ in
+            guard let self else { return }
+            // 一部だけの矩形で取り込むと縦書きの文字が欠けるので、全体を取り込んでから切り抜く
+            self.webView.createPDF(configuration: WKPDFConfiguration()) { [weak self] result in
+                guard let self else { return }
+                switch result {
+                case .failure(let error):
+                    completion(.failure(error))
+                case .success(let data):
+                    if let page = Self.layOutOnPaper(data, sliceWidth: slice.end - slice.start, scale: scale) {
+                        document.insert(page, at: document.pageCount)
+                    }
+                    self.capture(slices, index: index + 1, scale: scale, into: document, completion: completion)
+                }
+            }
+        }
+    }
+
+    /// 取り込んだ 1 枚の右端 sliceWidth ぶんを切り抜き、A4 の右側に揃えて置く（縦書きは右から読むため）
+    private static func layOutOnPaper(_ data: Data, sliceWidth: CGFloat, scale: CGFloat) -> PDFPage? {
+        guard let source = PDFDocument(data: data)?.page(at: 0) else { return nil }
+        let bounds = source.bounds(for: .mediaBox)
+        let output = NSMutableData()
+        var media = CGRect(origin: .zero, size: pageSize)
+        guard let consumer = CGDataConsumer(data: output as CFMutableData),
+              let context = CGContext(consumer: consumer, mediaBox: &media, nil) else { return nil }
+        context.beginPDFPage(nil)
+        context.translateBy(x: pageSize.width - pageMargin - bounds.width * scale, y: (pageSize.height - bounds.height * scale) / 2)
+        context.scaleBy(x: scale, y: scale)
+        context.clip(to: CGRect(x: bounds.width - sliceWidth, y: 0, width: sliceWidth, height: bounds.height))
+        source.draw(with: .mediaBox, to: context)
+        context.endPDFPage()
+        context.closePDF()
+        return PDFDocument(data: output as Data)?.page(at: 0)
     }
 
     // MARK: - PDF / 印刷
@@ -169,6 +267,18 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
         operation.showsPrintPanel = true
         operation.showsProgressPanel = true
         operation.view?.frame = webView.bounds
+        let parent = NSApp.mainWindow ?? window!
+        operation.runModal(for: parent, delegate: self, didRun: #selector(printDidRun(_:success:contextInfo:)), contextInfo: nil)
+    }
+
+    /// 組み立て済みの PDF を印刷する（縦書き用）
+    private func showPrintPanel(for document: PDFDocument) {
+        guard let operation = document.printOperation(for: printInfo(), scalingMode: .pageScaleNone, autoRotate: false) else {
+            finish(nil)
+            return
+        }
+        operation.showsPrintPanel = true
+        operation.showsProgressPanel = true
         let parent = NSApp.mainWindow ?? window!
         operation.runModal(for: parent, delegate: self, didRun: #selector(printDidRun(_:success:contextInfo:)), contextInfo: nil)
     }

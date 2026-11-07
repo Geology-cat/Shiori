@@ -646,13 +646,13 @@ details:not(.callout):not(.properties) > summary { cursor: pointer; }
 :root[data-writing="vertical"] figure {
   writing-mode: horizontal-tb;
   width: fit-content;
-  max-width: min(70vw, 46em);
+  max-width: var(--island-max, min(70vw, 46em));
   max-height: calc(100vh - 6em);
   margin: 0 1.5em;
   overflow: auto;
 }
 :root[data-writing="vertical"] figure { overflow: visible; }
-:root[data-writing="vertical"] figure img { max-height: calc(100vh - 10em); max-width: min(70vw, 46em); }
+:root[data-writing="vertical"] figure img { max-height: calc(100vh - 10em); max-width: var(--island-max, min(70vw, 46em)); }
 :root[data-writing="vertical"] .diagram svg { max-height: calc(100vh - 7em); }
 :root[data-writing="vertical"] .code-block pre { max-height: calc(100vh - 7em); padding-inline-end: 5em; }
 
@@ -679,7 +679,17 @@ details:not(.callout):not(.properties) > summary { cursor: pointer; }
    印刷・PDF
    ------------------------------------------------------------ */
 
+/* 縦書きの PDF は画面として描いたものを取り込むので、ここで紙向けに整える */
+:root[data-exporting="on"][data-exporting="on"] { --bg: #fff; --island-max: 620px; }
+:root[data-exporting="on"][data-writing="vertical"] .shiori-doc { inline-size: 100%; }
+:root[data-exporting="on"] #progress,
+:root[data-exporting="on"] .copy-btn { display: none !important; }
+:root[data-exporting="on"] #scroller { overflow: hidden; }
+:root[data-exporting="on"] .properties { display: none; }
+
 @media print {
+  /* マーカーやチェックボックスの背景色も印刷する */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { overflow: visible; block-size: auto; background: #fff; }
   #scroller { position: static; overflow: visible; }
   #progress, #lightbox, .copy-btn { display: none !important; }

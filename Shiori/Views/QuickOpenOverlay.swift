@@ -84,8 +84,7 @@ struct QuickOpenOverlay: View {
 
     private func relativeDirectory(_ url: URL) -> String {
         guard let root = workspace.rootURL else { return "" }
-        let dir = url.deletingLastPathComponent().path
-        return dir.count > root.path.count ? String(dir.dropFirst(root.path.count + 1)) : ""
+        return MarkdownEditing.relativePath(from: root, to: url.deletingLastPathComponent())
     }
 
     private func move(_ delta: Int) {

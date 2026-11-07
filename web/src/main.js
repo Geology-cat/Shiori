@@ -116,7 +116,8 @@ function detectLanguage(text) {
   const sample = text.slice(0, 4000);
   const cjk = (sample.match(/[぀-ヿ㐀-鿿]/g) || []).length;
   const latin = (sample.match(/[A-Za-z]/g) || []).length;
-  return cjk * 3 >= latin ? 'ja' : 'en';
+  // コードや数式で欧文が多くても、和文が 1 割ほどあれば日本語の文書とみなす
+  return cjk * 8 >= latin ? 'ja' : 'en';
 }
 
 // ------------------------------------------------------------
@@ -322,6 +323,16 @@ window.Shiori = {
   setForcedAppearance,
   exportDocument,
   scrollToFragment,
+  verticalPageSlices: (width) => scroll.verticalPageSlices(width),
+  // 書き出し用: 本文の右端から start の位置を画面の右端へ動かす
+  shiftForExport: (start) => {
+    content.style.transform = `translateX(${start}px)`;
+    return new Promise((resolve) => setTimeout(resolve, 50));
+  },
+  setExporting: (on) => {
+    if (on) root.dataset.exporting = 'on';
+    else delete root.dataset.exporting;
+  },
   topLine: () => scroll.topLine(),
   scrollToLine: (n) => scroll.scrollToLine(n),
   page: (dir) => scroll.page(dir),

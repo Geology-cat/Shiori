@@ -185,6 +185,64 @@ export function scrollToLine(n) {
   best.scrollIntoView({ block: 'start', inline: 'nearest' });
 }
 
+/**
+ * 縦書きを紙に割り付けるための改ページ位置を計算する。
+ * WebKit の印刷は縦書きを横方向にページ分割できないので、行が切れない位置を自前で探す。
+ * 位置は本文の右端からの距離で返す。
+ */
+export function verticalPageSlices(pageWidth) {
+  const ISLANDS = '.code-block, .table-wrap, .math-block, .diagram, .properties, .toc, figure, img, svg, .callout-title';
+  const box = content.getBoundingClientRect();
+  const right = box.right;
+  const intervals = [];
+  const add = (rect) => {
+    if (rect.width > 0 && rect.height > 0) intervals.push([right - rect.right, right - rect.left]);
+  };
+
+  for (const el of content.querySelectorAll(ISLANDS)) add(el.getBoundingClientRect());
+
+  // 本文の行はテキストノードの断片として測る（ルビの分も含まれる）
+  const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (!node.nodeValue.trim() || node.parentElement?.closest(ISLANDS)) continue;
+    range.selectNodeContents(node);
+    for (const rect of range.getClientRects()) add(rect);
+  }
+  if (intervals.length === 0) return [];
+
+  // 重なりをまとめて「文字がある帯」の列にする
+  intervals.sort((a, b) => a[0] - b[0]);
+  const bands = [];
+  for (const [start, end] of intervals) {
+    const last = bands[bands.length - 1];
+    if (last && start <= last[1] + 0.5) last[1] = Math.max(last[1], end);
+    else bands.push([start, end]);
+  }
+
+  const slices = [];
+  let index = 0;
+  while (index < bands.length) {
+    const start = Math.floor(bands[index][0]) - 1;
+    let end = bands[index][1];
+    let next = index + 1;
+    while (next < bands.length && bands[next][1] - start <= pageWidth) {
+      end = bands[next][1];
+      next += 1;
+    }
+    if (end - start > pageWidth) {
+      // 1 ページに収まらない大きな要素は諦めて途中で切る
+      slices.push({ start, end: start + pageWidth });
+      bands[index][0] = start + pageWidth;
+      continue;
+    }
+    slices.push({ start, end: Math.ceil(end) + 1 });
+    index = next;
+  }
+  return slices;
+}
+
 function progress() {
   if (isVertical()) {
     const max = scroller.scrollWidth - scroller.clientWidth;

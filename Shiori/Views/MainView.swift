@@ -88,7 +88,7 @@ struct DocumentArea: View {
         ZStack {
             Group {
                 if let tab = workspace.activeTab {
-                    ActiveDocumentView(workspace: workspace, tab: tab)
+                    ActiveDocumentView(workspace: workspace, tab: tab, find: workspace.find)
                 } else {
                     ZStack {
                         Color(nsColor: .textBackgroundColor)
@@ -103,6 +103,7 @@ struct DocumentArea: View {
 private struct ActiveDocumentView: View {
     @ObservedObject var workspace: WorkspaceModel
     @ObservedObject var tab: DocumentTab
+    @ObservedObject var find: FindState
 
     var body: some View {
         VStack(spacing: 0) {
@@ -118,8 +119,8 @@ private struct ActiveDocumentView: View {
             ZStack(alignment: .topTrailing) {
                 HostedView(view: workspace.viewer.webView, isVisible: tab.mode == .read)
                 HostedView(view: workspace.editor.scrollView, isVisible: tab.mode == .edit)
-                if workspace.find.isVisible {
-                    FindBar(workspace: workspace, find: workspace.find)
+                if find.isVisible {
+                    FindBar(workspace: workspace, find: find)
                         .padding(.top, workspace.focusMode ? 34 : 10)
                         .padding(.trailing, 16)
                 }
