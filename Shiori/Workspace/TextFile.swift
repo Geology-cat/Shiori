@@ -149,7 +149,8 @@ enum TextFile {
     }
 
     static func modificationDate(of url: URL) -> Date? {
-        (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        // URL.resourceValues は値をキャッシュするので、外部変更の検知には使わない
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
     }
 
     static func encodingName(_ encoding: String.Encoding) -> String {

@@ -137,7 +137,8 @@ final class EditorController: NSObject, NSTextViewDelegate {
         let container = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
         container.widthTracksTextView = true
         layoutManager.addTextContainer(container)
-        layoutManager.allowsNonContiguousLayout = true
+        // 表示前（幅 0）に文書を差し込むと、非連続レイアウトでは改行が崩れたまま残る
+        layoutManager.allowsNonContiguousLayout = false
         NSTextStorage().addLayoutManager(layoutManager)
 
         textView = ShioriTextView(frame: .zero, textContainer: container)
