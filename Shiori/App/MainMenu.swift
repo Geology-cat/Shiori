@@ -33,6 +33,7 @@ final class MainMenuBuilder: NSObject, NSMenuDelegate {
     private var themeMenu: NSMenu?
     private var recentFilesMenu: NSMenu?
     private var recentFoldersMenu: NSMenu?
+    private var fontKeyMonitor: Any?
 
     init(delegate: AppDelegate) {
         self.delegate = delegate
@@ -42,7 +43,20 @@ final class MainMenuBuilder: NSObject, NSMenuDelegate {
     private var hasMarkdownTab: Bool { ws?.activeTab?.kind == .markdown }
     private var isEditing: Bool { ws?.activeTab?.mode == .edit && hasMarkdownTab }
 
+    /// ⌘+ は配列によって実際に届く文字が違う（US の ⌘=、JIS の ⌘;）ので、キーを直接見て受ける
+    private func installFontSizeKeyMonitor() {
+        fontKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.shift, .capsLock, .numericPad, .function])
+            guard modifiers == .command, let self else { return event }
+            let key = event.charactersIgnoringModifiers ?? ""
+            guard ["+", "=", ";"].contains(key), self.delegate.workspace != nil else { return event }
+            self.changeFontSize(1)
+            return nil
+        }
+    }
+
     func build() -> NSMenu {
+        installFontSizeKeyMonitor()
         let menu = NSMenu()
         menu.addItem(submenu(appMenu(), title: "Shiori"))
         menu.addItem(submenu(fileMenu(), title: "ファイル"))
@@ -308,11 +322,6 @@ final class MainMenuBuilder: NSObject, NSMenuDelegate {
 
         // 文字サイズ（閲覧中はビューワー、編集中はエディタに効く）
         menu.addItem(action("文字を大きく", "+") { [weak self] in self?.changeFontSize(1) })
-        // ⌘= でも同じ操作にする（US 配列では + にシフトが要るため）
-        let plus = action("文字を大きく", "=") { [weak self] in self?.changeFontSize(1) }
-        plus.isHidden = true
-        plus.allowsKeyEquivalentWhenHidden = true
-        menu.addItem(plus)
         menu.addItem(action("文字を小さく", "-") { [weak self] in self?.changeFontSize(-1) })
         menu.addItem(action("標準の文字サイズ", "0") { [weak self] in self?.changeFontSize(0) })
         menu.addItem(.separator())

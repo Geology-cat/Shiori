@@ -264,6 +264,18 @@ final class EditorController: NSObject, NSTextViewDelegate {
         return min(location, ns.length)
     }
 
+    /// 閲覧から切り替えたとき: カーソルが見えていなければ、見ている行へ移す（入力して飛ばないように）
+    func moveCursorIntoView(line: Int) {
+        guard let container = textView.textContainer else { return }
+        let selection = textView.selectedRange()
+        let glyphs = layoutManager.glyphRange(forCharacterRange: NSRange(location: selection.location, length: 0), actualCharacterRange: nil)
+        let rect = layoutManager.boundingRect(forGlyphRange: glyphs, in: container)
+            .offsetBy(dx: textView.textContainerOrigin.x, dy: textView.textContainerOrigin.y)
+        if !scrollView.contentView.bounds.intersects(rect) {
+            textView.setSelectedRange(NSRange(location: characterIndex(ofLine: line), length: 0))
+        }
+    }
+
     /// 指定行が画面の先頭に来るようにスクロールする
     func scrollToLine(_ line: Int, moveCursor: Bool = false) {
         guard let container = textView.textContainer else { return }

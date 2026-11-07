@@ -322,6 +322,7 @@ final class WorkspaceModel: ObservableObject {
         presentActive()
         if mode == .edit {
             editor.scrollToLine(line)
+            editor.moveCursorIntoView(line: line)
         }
     }
 

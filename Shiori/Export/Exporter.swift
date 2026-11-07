@@ -284,7 +284,8 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
 
     @objc private func printDidRun(_ operation: NSPrintOperation, success: Bool, contextInfo: UnsafeMutableRawPointer?) {
-        finish(nil)
+        // 印刷の完了はバックグラウンドのスレッドで通知されるので、UI の後始末はメインへ戻す
+        DispatchQueue.main.async { [self] in finish(nil) }
     }
 
     // MARK: - HTML
@@ -292,7 +293,8 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
     /// 描画済みの本文を、スクリプトなしで読める 1 枚の HTML にする
     private func writeHTML(_ exported: [String: Any], to url: URL) {
         do {
-            let page = try Self.composeHTML(exported, theme: settings["themeHref"] as? String, customHref: settings["customHref"] as? String)
+            let title = path.map { URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent } ?? url.deletingPathExtension().lastPathComponent
+            let page = try Self.composeHTML(exported, title: title, theme: settings["themeHref"] as? String, customHref: settings["customHref"] as? String)
             try page.write(to: url, atomically: true, encoding: .utf8)
             finish(nil)
         } catch {
@@ -338,7 +340,7 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
         }
     }
 
-    private static func composeHTML(_ e: [String: Any], theme: String?, customHref: String?) throws -> String {
+    private static func composeHTML(_ e: [String: Any], title: String, theme: String?, customHref: String?) throws -> String {
         let base = cssText(href: "css/base.css")
         let themeCSS = cssText(href: theme)
         let custom = cssText(href: customHref)
@@ -368,7 +370,7 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Shiori Export</title>
+        <title>\(title.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;"))</title>
         \(katexLink)
         <style>\(base)</style>
         <style>\(themeCSS)</style>
