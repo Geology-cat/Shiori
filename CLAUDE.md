@@ -48,6 +48,13 @@ make dmg         # 配布用 DMG
 
 `web/` を変更したら `make web` を実行して、`web/dist` も一緒にコミットする。Xcode のビルドは node を必要としない。
 
+## リリース
+
+1. `Info.plist` ではなく `project.pbxproj` の `MARKETING_VERSION` と `CURRENT_PROJECT_VERSION` を上げる
+2. `開発履歴.md` を更新してコミットし、push する
+3. `SIGN_IDENTITY=- make dmg` で DMG を作る。公開物はアドホック署名にする（Apple Development の証明書は配布向けではなく、署名にメールアドレスが入るため）
+4. `git tag vX.Y.Z` を打ち、`gh release create` で DMG を添付する
+
 ## 設計の要点
 
 ### 描画は WebView 側に集約する

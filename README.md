@@ -39,13 +39,19 @@ PDF、HTML（画像を埋め込んだ 1 ファイル）、印刷。外部ツー�
 
 ## インストール
 
-ソースからビルドして使います。Xcode 16 以降があれば、次のコマンドで `build/Shiori-4.0.dmg` ができます。
+[Releases](https://github.com/Geology-cat/Shiori/releases/latest) から DMG をダウンロードし、`Shiori.app` を Applications へドラッグしてください。動作環境は macOS 14 以降の Apple Silicon Mac です。
+
+Apple の公証を受けていないため、初回は macOS に止められます。次のどちらかで開けます。
+
+- 一度開こうとしたあと、システム設定の「プライバシーとセキュリティ」で「このまま開く」を押す
+- ターミナルで次のコマンドを実行する
 
 ```bash
-make dmg
+xattr -dr com.apple.quarantine /Applications/Shiori.app
 ```
 
-動作環境は macOS 14 以降です。`make dmg` で作られるのはビルドした Mac のアーキテクチャ向けです（Apple Silicon なら arm64）。初回に開くフォルダによっては、macOS がアクセスの許可を求めます。
+初回に開くフォルダによっては、macOS がアクセスの許可を求めます。
+
 ## キーボード操作
 
 | 操作 | キー |
@@ -73,6 +79,8 @@ Xcode 16 以降が必要です。ビューワーのビルド結果（`web/dist`�
 ```bash
 make run
 ```
+
+`make dmg` で配布用の DMG を作れます。作られるのはビルドした Mac のアーキテクチャ向けです。
 
 ビューワーを変更するときは Node.js も必要です。
 
