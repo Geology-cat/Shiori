@@ -7,6 +7,8 @@ export function lineMapPlugin(md) {
       if (!token.map || token.nesting < 0) continue;
       if (token.level > 6) continue; // 深いネストは位置合わせに不要
       token.attrSet('data-line', String(token.map[0] + offset));
+      // 終わりの行（含まない）。ブロック内のどのあたりを見ているかの換算に使う
+      token.attrSet('data-line-end', String(token.map[1] + offset));
     }
   });
 }

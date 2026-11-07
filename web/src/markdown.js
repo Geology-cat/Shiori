@@ -23,7 +23,7 @@ import { tagPlugin } from './plugins/tag.js';
 import { headingIdPlugin } from './plugins/heading-id.js';
 import { lineMapPlugin } from './plugins/linemap.js';
 import { imageSizePlugin } from './plugins/image-size.js';
-import { escapeHtml } from './util.js';
+import { escapeHtml, lineAttrs } from './util.js';
 
 /** 図表（mermaid など）としてブラウザ側で後処理する言語 */
 const DIAGRAM_LANGS = new Set(['mermaid']);
@@ -47,8 +47,7 @@ export function parseFenceInfo(info) {
 function renderFence(tokens, idx, _options, env, self) {
   const token = tokens[idx];
   const { lang, title } = parseFenceInfo(token.info);
-  const line = token.attrGet('data-line');
-  const lineAttr = line != null ? ` data-line="${line}"` : '';
+  const lineAttr = lineAttrs(token);
 
   if (DIAGRAM_LANGS.has(lang)) {
     env.hasMermaid = true;
@@ -121,8 +120,7 @@ export function createMarkdown({ breaks = true } = {}) {
 
   md.renderer.rules.fence = renderFence;
   md.renderer.rules.code_block = (tokens, idx, _o, _e) => {
-    const line = tokens[idx].attrGet('data-line');
-    const lineAttr = line != null ? ` data-line="${line}"` : '';
+    const lineAttr = lineAttrs(tokens[idx]);
     return `<div class="code-block"${lineAttr}><pre><code class="hljs">${escapeHtml(tokens[idx].content)}</code></pre></div>\n`;
   };
 

@@ -300,10 +300,10 @@ final class WorkspaceModel: ObservableObject {
     private func captureCurrentPositions() {
         guard let tab = activeTab else { return }
         if tab.mode == .read {
-            tab.viewerLine = status.topLine
+            // 閲覧中の位置はスクロールのたびに viewerDidScroll で更新されている
         } else {
             editor.captureState()
-            tab.viewerLine = editor.topVisibleLine()
+            tab.viewerLine = editor.topVisiblePosition()
         }
     }
 
@@ -314,15 +314,15 @@ final class WorkspaceModel: ObservableObject {
 
     func setMode(_ mode: DocMode) {
         guard let tab = activeTab, tab.kind == .markdown, tab.mode != mode else { return }
-        // 閲覧と編集で同じ箇所を見続けられるよう、ソースの行番号を受け渡す
+        // 閲覧と編集で同じ箇所を見続けられるよう、ソース上の位置（行と行内の割合）を受け渡す
         captureCurrentPositions()
-        let line = tab.viewerLine
+        let position = tab.viewerLine
         if mode == .read { _ = flush(tab) }
         tab.mode = mode
         presentActive()
         if mode == .edit {
-            editor.scrollToLine(line)
-            editor.moveCursorIntoView(line: line)
+            editor.scrollToPosition(position)
+            editor.moveCursorIntoView(position: position)
         }
     }
 
@@ -340,7 +340,7 @@ final class WorkspaceModel: ObservableObject {
         }
         refreshOutline(tab)
         pushViewerSettings()
-        status.topLine = tab.viewerLine
+        status.topLine = Int(tab.viewerLine)
         status.progress = 0
         switch tab.mode {
         case .read:
@@ -548,78 +548,84 @@ final class WorkspaceModel: ObservableObject {
         pushViewerSettings()
     }
 
-    /// 指定タブに効いている（ファイル固定を含む）テーマと組方向
+    /// 指定タブに効いているテーマ（ファイルごとの調整 → 環境設定の既定 の順に見る）
     func effectiveThemeID(for tab: DocumentTab?) -> String {
-        if let url = tab?.url, let id = ReadingStore.shared.state(for: url).themeID { return id }
-        return AppSettings.shared.themeID
+        tab?.overrides.themeID ?? AppSettings.shared.themeID
     }
 
     func effectiveWriting(for tab: DocumentTab?) -> WritingMode {
-        if let url = tab?.url, let mode = ReadingStore.shared.state(for: url).writing { return mode }
-        return AppSettings.shared.writing
+        tab?.overrides.writing ?? AppSettings.shared.writing
     }
 
-    func isViewPinned(_ tab: DocumentTab?) -> Bool {
-        guard let url = tab?.url else { return false }
-        return ReadingStore.shared.state(for: url).hasPinnedView
+    /// テーマの既定にファイルごとの調整を重ねた詳細設定
+    func effectiveStyle(for tab: DocumentTab?) -> ViewStyle {
+        let base = AppSettings.shared.style(for: effectiveThemeID(for: tab))
+        return tab?.overrides.applied(to: base) ?? base
     }
+
+    /// 表示パネルで変えた設定は、そのファイルだけに効く。既定は環境設定でしか変えない
+    func updateOverrides(_ change: (inout ViewOverrides) -> Void) {
+        guard let tab = activeTab else { return }
+        change(&tab.overrides)
+        if let url = tab.url {
+            let overrides = tab.overrides
+            ReadingStore.shared.update(url) { $0.overrides = overrides }
+        }
+        objectWillChange.send()
+        pushViewerSettings()
+    }
+
+    /// このファイルの調整をやめて既定の表示に戻す
+    func resetOverrides() {
+        updateOverrides { $0 = ViewOverrides() }
+    }
+
+    var hasOverrides: Bool { !(activeTab?.overrides.isEmpty ?? true) }
 
     func setTheme(_ id: String) {
-        if let url = activeTab?.url, isViewPinned(activeTab) {
-            ReadingStore.shared.update(url) { $0.themeID = id }
-            objectWillChange.send()
-            pushViewerSettings()
-        } else {
-            AppSettings.shared.themeID = id
-        }
+        updateOverrides { $0.themeID = id }
     }
 
     func setWriting(_ mode: WritingMode) {
-        if let url = activeTab?.url, isViewPinned(activeTab) {
-            ReadingStore.shared.update(url) { $0.writing = mode }
-            objectWillChange.send()
-            pushViewerSettings()
-        } else {
-            AppSettings.shared.writing = mode
-        }
+        updateOverrides { $0.writing = mode }
     }
 
     func toggleWriting() {
         setWriting(effectiveWriting(for: activeTab) == .horizontal ? .vertical : .horizontal)
     }
 
-    /// 今のテーマと組方向をこのファイルに固定する／固定を外す
-    func setViewPinned(_ pinned: Bool) {
-        guard let tab = activeTab, let url = tab.url else { return }
-        let theme = effectiveThemeID(for: tab)
-        let writing = effectiveWriting(for: tab)
-        ReadingStore.shared.update(url) {
-            $0.themeID = pinned ? theme : nil
-            $0.writing = pinned ? writing : nil
+    /// 閲覧中の文字サイズを変える（このファイルだけ）。0 で既定に戻す
+    func changeViewerFontScale(_ direction: Int) {
+        let current = effectiveStyle(for: activeTab).fontScale
+        updateOverrides {
+            switch direction {
+            case 1: $0.fontScale = ViewStyle.scaledUp(current)
+            case -1: $0.fontScale = ViewStyle.scaledDown(current)
+            default: $0.fontScale = nil
+            }
         }
-        objectWillChange.send()
-        pushViewerSettings()
     }
 
     func viewerSettingsPayload(for tab: DocumentTab?) -> [String: Any] {
         let s = AppSettings.shared
         let manager = ThemeManager.shared
         let theme = manager.theme(id: effectiveThemeID(for: tab))
+        let style = effectiveStyle(for: tab)
         var payload: [String: Any] = [
             "theme": theme.isUser ? "user" : theme.id,
             "themeHref": theme.href,
             "writing": effectiveWriting(for: tab).rawValue,
-            "fontScale": s.fontScale,
-            "lineHeight": s.lineHeight,
-            "measure": s.measure,
-            "headingNumbers": s.headingNumbers,
-            "indent": s.indent,
-            "justify": s.justify,
+            "fontScale": style.fontScale,
+            "lineHeight": style.lineHeight,
+            "measure": style.measure,
+            "headingNumbers": style.headingNumbers,
+            "indent": style.indent,
+            "justify": style.justify,
             "breaks": s.breaks,
             "showProperties": s.showProperties,
             "clickToPage": s.clickToPage,
         ]
-        if let font = s.fontFamilyCSS { payload["fontFamily"] = font }
+        if let font = style.fontFamilyCSS { payload["fontFamily"] = font }
         if s.useCustomCSS, let href = manager.customCSSHref { payload["customHref"] = href }
         return payload
     }
@@ -832,12 +838,12 @@ final class WorkspaceModel: ObservableObject {
 // MARK: - ビューワーからの通知
 
 extension WorkspaceModel: ViewerDelegate {
-    func viewerDidScroll(topLine: Int, progress: Double) {
+    func viewerDidScroll(position: Double, progress: Double) {
         guard let tab = activeTab, tab.mode == .read else { return }
-        status.topLine = topLine
+        status.topLine = Int(position)
         status.progress = progress
-        tab.viewerLine = topLine
-        if let url = tab.url { ReadingStore.shared.update(url) { $0.line = topLine } }
+        tab.viewerLine = position
+        if let url = tab.url { ReadingStore.shared.update(url) { $0.line = position } }
     }
 
     func viewerOpenPath(_ path: String, fragment: String?, newTab: Bool) {

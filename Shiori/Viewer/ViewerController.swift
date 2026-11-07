@@ -94,15 +94,15 @@ final class ViewerController: NSObject {
                 tab.pendingFragment = nil
                 call("return Shiori.scrollToFragment(f)", ["f": fragment]) { _ in completion?() }
             } else {
-                call("return Shiori.scrollToLine(n)", ["n": tab.viewerLine]) { _ in completion?() }
+                call("return Shiori.scrollToPosition(n)", ["n": tab.viewerLine]) { _ in completion?() }
             }
             return
         }
-        render(tab, line: tab.viewerLine, completion: completion)
+        render(tab, position: tab.viewerLine, completion: completion)
     }
 
     /// 必ず描画し直す
-    func render(_ tab: DocumentTab, line: Int? = nil, keepPosition: Bool = false, completion: (() -> Void)? = nil) {
+    func render(_ tab: DocumentTab, position: Double? = nil, keepPosition: Bool = false, completion: (() -> Void)? = nil) {
         renderedTabID = tab.id
         renderedVersion = tab.version
         if tab.kind == .image, let url = tab.url {
@@ -111,7 +111,7 @@ final class ViewerController: NSObject {
         }
         var params: [String: Any] = ["markdown": tab.text, "keepPosition": keepPosition]
         if let url = tab.url { params["path"] = url.path }
-        if let line { params["line"] = line }
+        if let position { params["position"] = position }
         let fragment = tab.pendingFragment
         tab.pendingFragment = nil
         call("return await Shiori.render(p)", ["p": params]) { [weak self] _ in
@@ -169,7 +169,7 @@ final class ViewerController: NSObject {
 
 /// ビューワーからの通知
 protocol ViewerDelegate: AnyObject {
-    func viewerDidScroll(topLine: Int, progress: Double)
+    func viewerDidScroll(position: Double, progress: Double)
     func viewerOpenPath(_ path: String, fragment: String?, newTab: Bool)
     func viewerOpenExternal(_ url: URL)
     func viewerOpenWikilink(_ target: String, newTab: Bool)
@@ -212,7 +212,8 @@ extension ViewerController: WKScriptMessageHandler, WKScriptMessageHandlerWithRe
             pendingAfterReady = []
             pending.forEach { $0() }
         case "scroll":
-            delegate?.viewerDidScroll(topLine: body["topLine"] as? Int ?? 0, progress: body["progress"] as? Double ?? 0)
+            let position = (body["position"] as? NSNumber)?.doubleValue ?? 0
+            delegate?.viewerDidScroll(position: position, progress: body["progress"] as? Double ?? 0)
         case "openPath":
             guard let path = body["path"] as? String else { return }
             let fragment = (body["fragment"] as? String).flatMap { $0.isEmpty ? nil : $0 }

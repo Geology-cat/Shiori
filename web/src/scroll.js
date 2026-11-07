@@ -4,6 +4,8 @@ import { post } from './bridge.js';
 let scroller;
 let content;
 let interacted = false;
+/** 最後にプログラムで合わせた位置。文書の端でスクロールが止まっても、元の位置を覚えておく */
+let pinned = null;
 let clickToPage = false;
 let notifyTimer = null;
 const root = document.documentElement;
@@ -152,37 +154,84 @@ export function scrollToEnd() {
   else scroller.scrollTop = scroller.scrollHeight;
 }
 
-/** 画面の先頭に見えているブロックのソース行を返す */
-export function topLine() {
+function lineSpan(el) {
+  const start = Number(el.dataset.line);
+  const end = el.dataset.lineEnd != null ? Number(el.dataset.lineEnd) : start + 1;
+  return [start, Math.max(start + 1, end)];
+}
+
+/**
+ * 画面の先頭に見えている位置をソースの行で返す。
+ * 整数部が行、小数部はブロックの中をどこまで読んだか（長い段落の途中でも位置がずれないように）。
+ * 縦書きでは右端が先頭になる。
+ */
+function scrollOffset() {
+  return isVertical() ? scroller.scrollLeft : scroller.scrollTop;
+}
+
+export function topPosition() {
+  // 合わせたあとユーザーが動かしていなければ、合わせた位置をそのまま返す
+  if (pinned && Math.abs(scrollOffset() - pinned.offset) < 1 && pinned.writing === root.dataset.writing) {
+    return pinned.position;
+  }
+  pinned = null;
   const box = scroller.getBoundingClientRect();
   const vertical = isVertical();
-  let line = 0;
+  let best = null;
+  let bestRect = null;
   for (const el of content.querySelectorAll('[data-line]')) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) continue; // 閉じた折りたたみの中など
-    const started = vertical ? r.right <= box.right + 4 : r.top <= box.top + 4;
+    // 先頭の辺が画面の先頭に達したブロックを「読み始めた」とみなす
+    const started = vertical ? r.right >= box.right - 2 : r.top <= box.top + 2;
     if (!started) break;
-    const n = Number(el.dataset.line);
-    if (n >= line) line = n;
+    if (best && Number(el.dataset.line) < Number(best.dataset.line)) continue;
+    best = el;
+    bestRect = r;
   }
-  return line;
+  if (!best) return 0;
+  const [start, end] = lineSpan(best);
+  const extent = vertical ? bestRect.width : bestRect.height;
+  const passed = vertical ? bestRect.right - box.right : box.top - bestRect.top;
+  const fraction = extent > 0 ? Math.min(0.999, Math.max(0, passed / extent)) : 0;
+  return start + fraction * (end - start);
 }
 
-/** 指定行を含むブロックが画面の先頭に来るようにスクロールする */
-export function scrollToLine(n) {
+export function topLine() {
+  return Math.floor(topPosition());
+}
+
+/** topPosition で得た位置が画面の先頭に来るようにスクロールする */
+export function scrollToPosition(position) {
+  pinned = null;
+  if (!(position > 0)) {
+    scrollToStart();
+    return;
+  }
+  const line = Math.floor(position);
   let best = null;
   for (const el of content.querySelectorAll('[data-line]')) {
-    const line = Number(el.dataset.line);
-    if (line > n) break;
+    if (Number(el.dataset.line) > line) break;
     const r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) continue;
     best = el;
   }
-  if (!best || n <= 0) {
+  if (!best) {
     scrollToStart();
     return;
   }
-  best.scrollIntoView({ block: 'start', inline: 'nearest' });
+  const [start, end] = lineSpan(best);
+  const fraction = Math.min(1, Math.max(0, (position - start) / (end - start)));
+  const r = best.getBoundingClientRect();
+  const box = scroller.getBoundingClientRect();
+  if (isVertical()) scroller.scrollLeft += r.right - fraction * r.width - box.right;
+  else scroller.scrollTop += r.top + fraction * r.height - box.top;
+  pinned = { position, offset: scrollOffset(), writing: root.dataset.writing };
+}
+
+/** 指定行のブロックが画面の先頭に来るようにスクロールする（目次から飛ぶとき） */
+export function scrollToLine(n) {
+  scrollToPosition(n);
 }
 
 /**
@@ -266,5 +315,6 @@ export function notify() {
   const value = progress();
   const bar = document.getElementById('progress');
   if (bar) bar.style.setProperty('--progress', String(value));
-  post('scroll', { topLine: topLine(), progress: value });
+  const position = topPosition();
+  post('scroll', { topLine: Math.floor(position), position, progress: value });
 }

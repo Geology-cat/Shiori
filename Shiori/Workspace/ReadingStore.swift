@@ -1,13 +1,13 @@
 import Foundation
 
-/// ファイルごとの読書位置と、ファイルに固定した表示設定
+/// ファイルごとの読書位置と表示の調整
 struct FileViewState: Codable {
-    var line: Int = 0
-    var themeID: String?
-    var writing: WritingMode?
+    /// 読んでいた位置（整数部が行、小数部が行の中のどのあたりか）
+    var line: Double = 0
+    var overrides = ViewOverrides()
     var updatedAt: Date = Date()
 
-    var hasPinnedView: Bool { themeID != nil || writing != nil }
+    var hasOverrides: Bool { !overrides.isEmpty }
 }
 
 /// 読書位置などを JSON に保存する。Vault を作らないのでアプリ側で覚えておく。
@@ -57,8 +57,8 @@ final class ReadingStore {
         saveWork?.cancel()
         saveWork = nil
         if entries.count > Self.maxEntries {
-            // 古いものから捨てる（固定した設定は残す）
-            let removable = entries.filter { !$0.value.hasPinnedView }.sorted { $0.value.updatedAt < $1.value.updatedAt }
+            // 古いものから捨てる（表示を調整したファイルは残す）
+            let removable = entries.filter { !$0.value.hasOverrides }.sorted { $0.value.updatedAt < $1.value.updatedAt }
             for (key, _) in removable.prefix(entries.count - Self.maxEntries) { entries.removeValue(forKey: key) }
         }
         guard let data = try? JSONEncoder().encode(entries) else { return }

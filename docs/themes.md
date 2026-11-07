@@ -79,7 +79,7 @@
 | `.task-item` `.task-checkbox` | タスク |
 | `.toc` | `[[toc]]` の目次 |
 | `.footnotes` | 脚注 |
-| `.tag` `.wikilink` `.embed` | Obsidian の記法 |
+| `.tag` `.wikilink` `.embed` | タグ、Wiki リンク、ノートの埋め込み |
 | `em.bouten` `.tcy` | 傍点と縦中横 |
 
 `:root` の属性でも分岐できます。

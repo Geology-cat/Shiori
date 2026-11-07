@@ -229,14 +229,54 @@ final class EditorController: NSObject, NSTextViewDelegate {
 
     // MARK: - 行番号との変換
 
-    /// 画面の先頭に見えている行（0 始まり）
-    func topVisibleLine() -> Int {
-        guard let container = textView.textContainer else { return 0 }
+    /// 画面の先頭に見えている位置。整数部が行（0 始まり）、小数部はその行の中のどのあたりか。
+    /// 長い段落は 1 行が画面の何行分にもなるので、行内の位置まで渡さないと切替のたびにずれる。
+    func topVisiblePosition() -> Double {
+        // 合わせたあと動かしていなければ、合わせた位置をそのまま返す（文書の末尾でスクロールが止まった場合など）
+        if let pinned = pinnedPosition, abs(scrollView.contentView.bounds.origin.y - pinned.offset) < 1, pinned.tab === currentTab {
+            return pinned.position
+        }
+        guard let container = textView.textContainer, textView.string.utf16.count > 0 else { return 0 }
+        layoutManager.ensureLayout(for: container)
         let origin = scrollView.contentView.bounds.origin
-        let point = NSPoint(x: 0, y: origin.y - textView.textContainerOrigin.y + 2)
-        let glyph = layoutManager.glyphIndex(for: point, in: container)
+        let y = origin.y - textView.textContainerOrigin.y
+        if y <= 0 { return 0 }
+        let glyph = layoutManager.glyphIndex(for: NSPoint(x: 0, y: y + 1), in: container)
         let character = layoutManager.characterIndexForGlyph(at: glyph)
-        return lineNumber(at: character)
+        let ns = textView.string as NSString
+        let lineRange = ns.lineRange(for: NSRange(location: min(character, ns.length), length: 0))
+        let length = max(1, lineRange.length)
+        let fraction = min(0.999, Double(character - lineRange.location) / Double(length))
+        return Double(lineNumber(at: character)) + fraction
+    }
+
+    /// topVisiblePosition で得た位置が画面の先頭に来るようにスクロールする
+    func scrollToPosition(_ position: Double) {
+        guard let container = textView.textContainer else { return }
+        layoutManager.ensureLayout(for: container)
+        guard position > 0 else {
+            setScroll(0)
+            pinnedPosition = nil
+            return
+        }
+        let index = characterIndex(atPosition: position)
+        let glyph = min(layoutManager.glyphIndexForCharacter(at: index), max(0, layoutManager.numberOfGlyphs - 1))
+        let rect = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+        setScroll(max(0, rect.minY + textView.textContainerOrigin.y))
+        pinnedPosition = (position, scrollView.contentView.bounds.origin.y, currentTab)
+    }
+
+    /// 最後にプログラムで合わせた位置
+    private var pinnedPosition: (position: Double, offset: CGFloat, tab: DocumentTab?)?
+
+    private func characterIndex(atPosition position: Double) -> Int {
+        let line = Int(position.rounded(.down))
+        let start = characterIndex(ofLine: line)
+        let ns = textView.string as NSString
+        guard start < ns.length else { return ns.length }
+        let lineRange = ns.lineRange(for: NSRange(location: start, length: 0))
+        let offset = Int((position - Double(line)) * Double(lineRange.length))
+        return min(start + max(0, offset), ns.length)
     }
 
     func lineNumber(at character: Int) -> Int {
@@ -266,14 +306,14 @@ final class EditorController: NSObject, NSTextViewDelegate {
     }
 
     /// 閲覧から切り替えたとき: カーソルが見えていなければ、見ている行へ移す（入力して飛ばないように）
-    func moveCursorIntoView(line: Int) {
+    func moveCursorIntoView(position: Double) {
         guard let container = textView.textContainer else { return }
         let selection = textView.selectedRange()
         let glyphs = layoutManager.glyphRange(forCharacterRange: NSRange(location: selection.location, length: 0), actualCharacterRange: nil)
         let rect = layoutManager.boundingRect(forGlyphRange: glyphs, in: container)
             .offsetBy(dx: textView.textContainerOrigin.x, dy: textView.textContainerOrigin.y)
         if !scrollView.contentView.bounds.intersects(rect) {
-            textView.setSelectedRange(NSRange(location: characterIndex(ofLine: line), length: 0))
+            textView.setSelectedRange(NSRange(location: characterIndex(atPosition: position), length: 0))
         }
     }
 

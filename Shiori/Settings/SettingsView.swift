@@ -9,7 +9,7 @@ enum SettingsWindow {
         window.title = "環境設定"
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 520, height: 440))
+        window.setContentSize(NSSize(width: 540, height: 600))
         return window
     }
 }
@@ -31,7 +31,7 @@ struct SettingsView: View {
                 .tabItem { Label("エディタ", systemImage: "pencil") }
         }
         .padding(16)
-        .frame(width: 520, height: 440)
+        .frame(width: 540, height: 600)
     }
 }
 
@@ -65,23 +65,52 @@ private struct GeneralTab: View {
 private struct ViewerTab: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var themes: ThemeManager
+    /// 詳細を編集しているテーマ
+    @State private var editingThemeID: String?
+
+    private var themeID: String { editingThemeID ?? settings.themeID }
+
+    private var styleBinding: Binding<ViewStyle> {
+        Binding(
+            get: { settings.style(for: themeID) },
+            set: { settings.setStyle($0, for: themeID) }
+        )
+    }
 
     var body: some View {
         Form {
-            Picker("既定のテーマ", selection: $settings.themeID) {
-                ForEach(themes.allThemes) { Text($0.name).tag($0.id) }
-            }
-            Picker("既定の組方向", selection: $settings.writing) {
-                ForEach(WritingMode.allCases) { Text($0.label).tag($0) }
-            }
-            LabeledContent("文字サイズ") {
-                HStack {
-                    Slider(value: $settings.fontScale, in: 0.5...3.0, step: 0.1)
-                    Text("\(Int((settings.fontScale * 100).rounded()))%")
-                        .monospacedDigit()
-                        .frame(width: 44, alignment: .trailing)
+            Section {
+                Picker("既定のテーマ", selection: $settings.themeID) {
+                    ForEach(themes.allThemes) { Text($0.name).tag($0.id) }
                 }
+                Picker("既定の組方向", selection: $settings.writing) {
+                    ForEach(WritingMode.allCases) { Text($0.label).tag($0) }
+                }
+            } footer: {
+                Text("文書を開いたときの表示です。表示パネル（Aa）で変えた設定はそのファイルだけに効きます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
+
+            Section {
+                Picker("テーマ", selection: Binding(get: { themeID }, set: { editingThemeID = $0 })) {
+                    ForEach(themes.allThemes) { Text($0.name).tag($0.id) }
+                }
+                StyleEditor(style: styleBinding, writing: settings.writing)
+                    .padding(.vertical, 4)
+                HStack {
+                    Spacer()
+                    Button("このテーマの設定を初期値に戻す") { settings.setStyle(ViewStyle(), for: themeID) }
+                        .disabled(settings.style(for: themeID) == ViewStyle())
+                }
+            } header: {
+                Text("テーマごとの既定")
+            } footer: {
+                Text("テーマを選んだときの文字の大きさや組版です。設定はテーマごとに保存されます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("表示") {
                 Toggle("改行をそのまま改行として表示する", isOn: $settings.breaks)
                 Toggle("フロントマターのプロパティを表示する", isOn: $settings.showProperties)

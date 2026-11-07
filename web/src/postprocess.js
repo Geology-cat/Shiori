@@ -89,6 +89,7 @@ function wrapFigures(fragment) {
 
     const figure = document.createElement('figure');
     if (p.dataset.line) figure.dataset.line = p.dataset.line;
+    if (p.dataset.lineEnd) figure.dataset.lineEnd = p.dataset.lineEnd;
     if (imgs.length > 1) figure.classList.add('figure-group');
     for (const img of imgs) figure.appendChild(img);
     // 説明文は title を優先し、なければファイル名らしくない alt を使う
@@ -122,6 +123,7 @@ function wrapTables(fragment) {
     const wrap = document.createElement('div');
     wrap.className = 'table-wrap';
     if (table.dataset.line) wrap.dataset.line = table.dataset.line;
+    if (table.dataset.lineEnd) wrap.dataset.lineEnd = table.dataset.lineEnd;
     table.replaceWith(wrap);
     wrap.appendChild(table);
   }
@@ -339,7 +341,10 @@ export async function resolveWikiEmbeds(fragment, docPath, options, depth = 0) {
     head.textContent = target;
     box.append(head, inner);
     // 埋め込み側の行番号はこの文書の行ではないので消す
-    box.querySelectorAll('[data-line]').forEach((el) => el.removeAttribute('data-line'));
+    box.querySelectorAll('[data-line]').forEach((el) => {
+      el.removeAttribute('data-line');
+      el.removeAttribute('data-line-end');
+    });
     box.querySelectorAll('.task-checkbox').forEach((el) => { el.disabled = true; });
     const para = span.parentElement;
     if (para?.tagName === 'P' && para.childNodes.length === 1) para.replaceWith(box);

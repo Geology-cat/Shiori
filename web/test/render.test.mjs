@@ -52,7 +52,7 @@ test('フロントマターがあっても行番号がソース基準', () => {
   assert.match(out, /class="doc-title">表題/);
   assert.match(out, /class="doc-author">著者/);
   assert.match(out, /<th>tags<\/th><td>a, b<\/td>/);
-  assert.match(out, /<p data-line="6">本文/);
+  assert.match(out, /<p data-line="6" data-line-end="7">本文/);
   assert.match(out, /data-task-line="8"/);
 });
 
@@ -65,6 +65,13 @@ test('壊れた YAML でも本文を失わない', () => {
 
 test('--- で始まるだけの本文はフロントマターにしない', () => {
   assert.match(html('---\n\n本文'), /<hr/);
+});
+
+test('ブロックに開始行と終了行が付く（閲覧⇔編集の位置合わせ用）', () => {
+  const out = html('一行目\n二行目\n三行目\n\n```js\na\nb\n```\n\n$$\nx\n$$\n');
+  assert.match(out, /<p data-line="0" data-line-end="3">/);
+  assert.match(out, /class="code-block" data-line="4" data-line-end="8"/);
+  assert.match(out, /class="math-block" data-tex="x" data-line="9" data-line-end="12"/);
 });
 
 test('脚注・定義リスト・上下付き・マーカー・略語', () => {
@@ -100,7 +107,7 @@ test('MkDocs Admonition と ::: コンテナ', () => {
   assert.match(a, /data-callout="note"/);
   assert.match(a, /class="callout-title">題/);
   assert.match(a, /<em>強調<\/em>/);
-  assert.match(a, /<p data-line="3">後続/);
+  assert.match(a, /<p data-line="3" data-line-end="4">後続/);
 
   assert.match(html('??? warning\n    隠す'), /<details[^>]*data-callout="warning"/);
   assert.match(html(':::warning\n注意\n:::'), /data-callout="warning"/);

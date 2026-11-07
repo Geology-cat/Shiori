@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 上部バーの「Aa」から開く、表示の設定パネル
+/// 上部バーの「Aa」から開く表示パネル。ここでの変更はこのファイルだけに効き、既定は変えない。
 struct ReadingOptionsView: View {
     @ObservedObject var workspace: WorkspaceModel
     @ObservedObject var settings: AppSettings
@@ -10,9 +10,29 @@ struct ReadingOptionsView: View {
     private var currentTheme: String { workspace.effectiveThemeID(for: tab) }
     private var currentWriting: WritingMode { workspace.effectiveWriting(for: tab) }
 
+    /// 詳細設定を編集すると、既定と違う項目だけがこのファイルの調整として残る
+    private var styleBinding: Binding<ViewStyle> {
+        Binding(
+            get: { workspace.effectiveStyle(for: tab) },
+            set: { newValue in
+                let old = workspace.effectiveStyle(for: tab)
+                workspace.updateOverrides { o in
+                    if newValue.fontScale != old.fontScale { o.fontScale = newValue.fontScale }
+                    if newValue.lineHeight != old.lineHeight { o.lineHeight = newValue.lineHeight }
+                    if newValue.measure != old.measure { o.measure = newValue.measure }
+                    if newValue.fontChoice != old.fontChoice { o.fontChoice = newValue.fontChoice }
+                    if newValue.customFontName != old.customFontName { o.customFontName = newValue.customFontName }
+                    if newValue.indent != old.indent { o.indent = newValue.indent }
+                    if newValue.justify != old.justify { o.justify = newValue.justify }
+                    if newValue.headingNumbers != old.headingNumbers { o.headingNumbers = newValue.headingNumbers }
+                }
+            }
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            section("テーマ") {
+            OptionSection(title: "テーマ") {
                 VStack(spacing: 3) {
                     ForEach(themes.allThemes) { theme in
                         ThemeRow(theme: theme, isSelected: currentTheme == theme.id) {
@@ -22,7 +42,7 @@ struct ReadingOptionsView: View {
                 }
             }
 
-            section("組方向") {
+            OptionSection(title: "組方向") {
                 Picker("", selection: Binding(get: { currentWriting }, set: { workspace.setWriting($0) })) {
                     ForEach(WritingMode.allCases) { Text($0.label).tag($0) }
                 }
@@ -30,80 +50,24 @@ struct ReadingOptionsView: View {
                 .labelsHidden()
             }
 
-            section("文字") {
-                VStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        Text("サイズ").font(.system(size: 12)).frame(width: 44, alignment: .leading)
-                        IconButton(systemName: "textformat.size.smaller", help: "小さく (⌘-)") { settings.decreaseFontScale() }
-                        Text("\(Int((settings.fontScale * 100).rounded()))%")
-                            .font(.system(size: 12))
-                            .monospacedDigit()
-                            .frame(maxWidth: .infinity)
-                        IconButton(systemName: "textformat.size.larger", help: "大きく (⌘+)") { settings.increaseFontScale() }
-                    }
-                    SliderRow(
-                        title: "行間",
-                        value: $settings.lineHeight,
-                        range: 1.2...2.6,
-                        step: 0.05,
-                        format: { String(format: "%.2f", $0) }
-                    )
-                    SliderRow(
-                        title: currentWriting == .vertical ? "字詰め" : "本文幅",
-                        value: $settings.measure,
-                        range: 20...80,
-                        step: 1,
-                        format: { "\(Int($0)) 字" }
-                    )
-                    HStack(spacing: 8) {
-                        Text("書体").font(.system(size: 12)).frame(width: 44, alignment: .leading)
-                        Picker("", selection: $settings.fontChoice) {
-                            ForEach(FontChoice.allCases) { Text($0.label).tag($0) }
-                        }
-                        .labelsHidden()
-                        .controlSize(.small)
-                    }
-                    if settings.fontChoice == .custom {
-                        TextField("フォント名（例: Hiragino Maru Gothic ProN）", text: $settings.customFontName)
-                            .textFieldStyle(.roundedBorder)
-                            .controlSize(.small)
-                    }
-                }
-            }
-
-            section("組版") {
-                VStack(alignment: .leading, spacing: 5) {
-                    Toggle("段落の字下げ", isOn: $settings.indent)
-                    Toggle("両端揃え", isOn: $settings.justify)
-                    Toggle("見出しに番号を振る", isOn: $settings.headingNumbers)
-                }
-                .toggleStyle(.checkbox)
-                .font(.system(size: 12))
-            }
+            StyleEditor(style: styleBinding, writing: currentWriting)
 
             Divider()
 
-            if tab?.url != nil {
-                Toggle("テーマと組方向をこのファイルに固定", isOn: Binding(
-                    get: { workspace.isViewPinned(tab) },
-                    set: { workspace.setViewPinned($0) }
-                ))
-                .toggleStyle(.checkbox)
-                .font(.system(size: 12))
-                .help("オンにすると、このファイルだけ今のテーマと組方向で開きます")
-            }
-
-            HStack {
-                Button("元に戻す") {
-                    settings.fontScale = 1
-                    settings.lineHeight = 0
-                    settings.measure = 0
-                    settings.fontChoice = .theme
-                    settings.indent = false
-                    settings.justify = false
-                    settings.headingNumbers = false
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(workspace.hasOverrides ? "このファイル用に調整しています" : "既定の表示です")
+                        .font(.system(size: 11.5, weight: .medium))
+                    Text("既定は環境設定で変更できます")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
                 }
-                .controlSize(.small)
+                Spacer()
+                Button("既定に戻す") { workspace.resetOverrides() }
+                    .controlSize(.small)
+                    .disabled(!workspace.hasOverrides)
+            }
+            HStack {
                 Spacer()
                 Button("環境設定…") { AppDelegate.shared.showSettings(nil) }
                     .controlSize(.small)
@@ -112,8 +76,72 @@ struct ReadingOptionsView: View {
         .padding(14)
         .frame(width: 300)
     }
+}
 
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+/// 文字・組版の詳細設定（表示パネルと環境設定で共通）
+struct StyleEditor: View {
+    @Binding var style: ViewStyle
+    let writing: WritingMode
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            OptionSection(title: "文字") {
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        Text("サイズ").font(.system(size: 12)).frame(width: 44, alignment: .leading)
+                        IconButton(systemName: "textformat.size.smaller", help: "小さく") {
+                            style.fontScale = ViewStyle.scaledDown(style.fontScale)
+                        }
+                        Text("\(Int((style.fontScale * 100).rounded()))%")
+                            .font(.system(size: 12))
+                            .monospacedDigit()
+                            .frame(maxWidth: .infinity)
+                        IconButton(systemName: "textformat.size.larger", help: "大きく") {
+                            style.fontScale = ViewStyle.scaledUp(style.fontScale)
+                        }
+                    }
+                    SliderRow(title: "行間", value: $style.lineHeight, range: 1.2...2.6, step: 0.05) {
+                        String(format: "%.2f", $0)
+                    }
+                    SliderRow(title: writing == .vertical ? "字詰め" : "本文幅", value: $style.measure, range: 20...80, step: 1) {
+                        "\(Int($0)) 字"
+                    }
+                    HStack(spacing: 8) {
+                        Text("書体").font(.system(size: 12)).frame(width: 44, alignment: .leading)
+                        Picker("", selection: $style.fontChoice) {
+                            ForEach(FontChoice.allCases) { Text($0.label).tag($0) }
+                        }
+                        .labelsHidden()
+                        .controlSize(.small)
+                        .fixedSize()
+                        Spacer(minLength: 0)
+                    }
+                    if style.fontChoice == .custom {
+                        TextField("フォント名（例: Hiragino Maru Gothic ProN）", text: $style.customFontName)
+                            .textFieldStyle(.roundedBorder)
+                            .controlSize(.small)
+                    }
+                }
+            }
+
+            OptionSection(title: "組版") {
+                VStack(alignment: .leading, spacing: 5) {
+                    Toggle("段落の字下げ", isOn: $style.indent)
+                    Toggle("両端揃え", isOn: $style.justify)
+                    Toggle("見出しに番号を振る", isOn: $style.headingNumbers)
+                }
+                .toggleStyle(.checkbox)
+                .font(.system(size: 12))
+            }
+        }
+    }
+}
+
+struct OptionSection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 11, weight: .medium))
@@ -151,7 +179,7 @@ private struct ThemeRow: View {
     }
 }
 
-/// 0 を「テーマの既定」として扱うスライダー
+/// 0 を「テーマの値」として扱うスライダー
 private struct SliderRow: View {
     let title: String
     @Binding var value: Double
@@ -171,13 +199,13 @@ private struct SliderRow: View {
                 step: step
             )
             .controlSize(.small)
-            Button(value == 0 ? "既定" : format(value)) { value = 0 }
+            Button(value == 0 ? "テーマ" : format(value)) { value = 0 }
                 .buttonStyle(.plain)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
-                .frame(width: 42, alignment: .trailing)
-                .help("クリックでテーマの既定に戻す")
+                .frame(width: 46, alignment: .trailing)
+                .help("クリックでテーマの値に戻す")
         }
     }
 }

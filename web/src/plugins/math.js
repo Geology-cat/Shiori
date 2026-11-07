@@ -1,7 +1,7 @@
 // 数式を Markdown のパース段階で保護する。
 // $a_1 + b_1$ の _ や \\ が強調・エスケープに化けないよう、inline 処理より先に切り出す。
 // 実際の描画はブラウザ側で data-tex を KaTeX に渡して行う。
-import { escapeHtml } from '../util.js';
+import { escapeHtml, lineAttrs } from '../util.js';
 
 function isDigit(code) {
   return code >= 0x30 && code <= 0x39;
@@ -167,8 +167,7 @@ export function mathPlugin(md) {
   md.renderer.rules.math_block = (tokens, idx, _o, env) => {
     env.hasMath = true;
     const token = tokens[idx];
-    const line = token.attrGet('data-line');
-    const lineAttr = line != null ? ` data-line="${line}"` : '';
+    const lineAttr = lineAttrs(token);
     const tag = token.meta?.tag ? ` data-tag="${escapeHtml(token.meta.tag)}"` : '';
     return `<div class="math-block" data-tex="${escapeHtml(token.content)}"${tag}${lineAttr}></div>\n`;
   };

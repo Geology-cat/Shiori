@@ -29,9 +29,9 @@ function appearance() {
 }
 
 /** Markdown 全文を描画する。古い描画要求は途中で破棄する */
-async function render({ markdown, path = null, line = null, keepPosition = false }) {
+async function render({ markdown, path = null, position = null, keepPosition = false }) {
   const token = ++state.token;
-  const previousLine = keepPosition ? scroll.topLine() : null;
+  const previousPosition = keepPosition ? scroll.topPosition() : null;
   state.source = markdown;
   state.path = path;
   state.mode = 'markdown';
@@ -55,17 +55,16 @@ async function render({ markdown, path = null, line = null, keepPosition = false
   root.dataset.lang = detectLanguage(content.textContent);
   content.lang = root.dataset.lang;
 
-  const target = line ?? previousLine;
+  const target = position ?? previousPosition;
   scroll.resetInteraction();
-  if (target != null && target > 0) scroll.scrollToLine(target);
-  else scroll.scrollToStart();
+  scroll.scrollToPosition(target);
 
   // 画像の読込でレイアウトが動くので、ユーザーが触っていなければ位置を合わせ直す
   const images = Array.from(content.querySelectorAll('img')).filter((img) => !img.complete);
   if (images.length) {
     await Promise.allSettled(images.map((img) => img.decode()));
     if (token === state.token && target != null && target > 0 && !scroll.hasInteracted()) {
-      scroll.scrollToLine(target);
+      scroll.scrollToPosition(target);
     }
   }
   scroll.notify();
@@ -145,7 +144,7 @@ function setStylesheet(id, href) {
 }
 
 async function applySettings(s) {
-  const line = scroll.topLine();
+  const position = scroll.topPosition();
   const writingChanged = root.dataset.writing !== s.writing;
 
   await Promise.all([setStylesheet('theme-link', s.themeHref), setStylesheet('custom-link', s.customHref)]);
@@ -167,12 +166,10 @@ async function applySettings(s) {
   state.renderOptions = { breaks: !!s.breaks, showProperties: !!s.showProperties };
 
   if (breaksChanged || propsChanged) {
-    await render({ markdown: state.source, path: state.path, line });
-  } else if (writingChanged) {
-    // 縦⇔横ではスクロール軸が変わるので、行番号を基準に位置を合わせ直す
-    scroll.scrollToLine(line);
-  } else if (line > 0) {
-    scroll.scrollToLine(line);
+    await render({ markdown: state.source, path: state.path, position });
+  } else {
+    // 縦⇔横ではスクロール軸が変わるので、ソースの位置を基準に合わせ直す
+    scroll.scrollToPosition(position);
   }
   scroll.notify();
   return true;
@@ -333,7 +330,8 @@ window.Shiori = {
     if (on) root.dataset.exporting = 'on';
     else delete root.dataset.exporting;
   },
-  topLine: () => scroll.topLine(),
+  topPosition: () => scroll.topPosition(),
+  scrollToPosition: (p) => scroll.scrollToPosition(p),
   scrollToLine: (n) => scroll.scrollToLine(n),
   page: (dir) => scroll.page(dir),
   find: (query) => find.run(query, content),

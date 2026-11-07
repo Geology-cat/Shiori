@@ -336,6 +336,9 @@ final class MainMenuBuilder: NSObject, NSMenuDelegate {
         theme.submenu = themeSub
         themeMenu = themeSub
         menu.addItem(theme)
+        menu.addItem(action("このファイルの表示を既定に戻す", enabled: { [weak self] in self?.ws?.hasOverrides ?? false }) { [weak self] in
+            self?.ws?.resetOverrides()
+        })
         menu.addItem(.separator())
 
         menu.addItem(action("集中モード", "f", [.command, .option], checked: { [weak self] in self?.ws?.focusMode ?? false }) { [weak self] in
@@ -359,20 +362,17 @@ final class MainMenuBuilder: NSObject, NSMenuDelegate {
         return menu
     }
 
+    /// 閲覧中はこのファイルの表示を、編集中はエディタの文字サイズを変える
     private func changeFontSize(_ direction: Int) {
-        let settings = AppSettings.shared
         if isEditing {
+            let settings = AppSettings.shared
             switch direction {
             case 1: settings.editorFontSize = min(40, settings.editorFontSize + 1)
             case -1: settings.editorFontSize = max(9, settings.editorFontSize - 1)
             default: settings.editorFontSize = 14
             }
         } else {
-            switch direction {
-            case 1: settings.increaseFontScale()
-            case -1: settings.decreaseFontScale()
-            default: settings.fontScale = 1
-            }
+            ws?.changeViewerFontScale(direction)
         }
     }
 

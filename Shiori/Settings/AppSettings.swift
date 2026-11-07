@@ -29,7 +29,7 @@ enum AppearanceChoice: String, CaseIterable, Identifiable {
 }
 
 /// 本文フォントの選択
-enum FontChoice: String, CaseIterable, Identifiable {
+enum FontChoice: String, CaseIterable, Identifiable, Codable {
     case theme, mincho, gothic, custom
     var id: String { rawValue }
     var label: String {
@@ -58,16 +58,12 @@ final class AppSettings: ObservableObject {
     // ビューワー
     @Published var themeID: String { didSet { defaults.set(themeID, forKey: Keys.themeID) } }
     @Published var writing: WritingMode { didSet { defaults.set(writing.rawValue, forKey: Keys.writing) } }
-    @Published var fontScale: Double { didSet { defaults.set(fontScale, forKey: Keys.fontScale) } }
-    /// 0 のときはテーマの既定値を使う
-    @Published var lineHeight: Double { didSet { defaults.set(lineHeight, forKey: Keys.lineHeight) } }
-    /// 本文の幅 (em)。0 のときはテーマの既定値を使う
-    @Published var measure: Double { didSet { defaults.set(measure, forKey: Keys.measure) } }
-    @Published var fontChoice: FontChoice { didSet { defaults.set(fontChoice.rawValue, forKey: Keys.fontChoice) } }
-    @Published var customFontName: String { didSet { defaults.set(customFontName, forKey: Keys.customFontName) } }
-    @Published var headingNumbers: Bool { didSet { defaults.set(headingNumbers, forKey: Keys.headingNumbers) } }
-    @Published var indent: Bool { didSet { defaults.set(indent, forKey: Keys.indent) } }
-    @Published var justify: Bool { didSet { defaults.set(justify, forKey: Keys.justify) } }
+    /// テーマごとの既定の詳細設定。キーはテーマの ID
+    @Published var themeStyles: [String: ViewStyle] {
+        didSet {
+            if let data = try? JSONEncoder().encode(themeStyles) { defaults.set(data, forKey: Keys.themeStyles) }
+        }
+    }
     @Published var breaks: Bool { didSet { defaults.set(breaks, forKey: Keys.breaks) } }
     @Published var showProperties: Bool { didSet { defaults.set(showProperties, forKey: Keys.showProperties) } }
     @Published var clickToPage: Bool { didSet { defaults.set(clickToPage, forKey: Keys.clickToPage) } }
@@ -86,14 +82,7 @@ final class AppSettings: ObservableObject {
         static let showHiddenFiles = "showHiddenFiles"
         static let themeID = "themeID"
         static let writing = "writing"
-        static let fontScale = "fontScale"
-        static let lineHeight = "lineHeight"
-        static let measure = "measure"
-        static let fontChoice = "fontChoice"
-        static let customFontName = "customFontName"
-        static let headingNumbers = "headingNumbers"
-        static let indent = "indent"
-        static let justify = "justify"
+        static let themeStyles = "themeStyles"
         static let breaks = "breaks"
         static let showProperties = "showProperties"
         static let clickToPage = "clickToPage"
@@ -108,7 +97,6 @@ final class AppSettings: ObservableObject {
         d.register(defaults: [
             Keys.autosave: true,
             Keys.restoreSession: true,
-            Keys.fontScale: 1.0,
             Keys.breaks: true,
             Keys.showProperties: true,
             Keys.editorFontSize: 14.0,
@@ -121,14 +109,7 @@ final class AppSettings: ObservableObject {
         showHiddenFiles = d.bool(forKey: Keys.showHiddenFiles)
         themeID = d.string(forKey: Keys.themeID) ?? "default"
         writing = WritingMode(rawValue: d.string(forKey: Keys.writing) ?? "") ?? .horizontal
-        fontScale = d.double(forKey: Keys.fontScale)
-        lineHeight = d.double(forKey: Keys.lineHeight)
-        measure = d.double(forKey: Keys.measure)
-        fontChoice = FontChoice(rawValue: d.string(forKey: Keys.fontChoice) ?? "") ?? .theme
-        customFontName = d.string(forKey: Keys.customFontName) ?? ""
-        headingNumbers = d.bool(forKey: Keys.headingNumbers)
-        indent = d.bool(forKey: Keys.indent)
-        justify = d.bool(forKey: Keys.justify)
+        themeStyles = d.data(forKey: Keys.themeStyles).flatMap { try? JSONDecoder().decode([String: ViewStyle].self, from: $0) } ?? [:]
         breaks = d.bool(forKey: Keys.breaks)
         showProperties = d.bool(forKey: Keys.showProperties)
         clickToPage = d.bool(forKey: Keys.clickToPage)
@@ -147,20 +128,12 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// CSS の font-family 値。テーマの既定を使うときは nil
-    var fontFamilyCSS: String? {
-        switch fontChoice {
-        case .theme: return nil
-        case .mincho: return "\"Hiragino Mincho ProN\", \"YuMincho\", serif"
-        case .gothic: return "-apple-system, \"Hiragino Sans\", \"Hiragino Kaku Gothic ProN\", sans-serif"
-        case .custom:
-            let name = customFontName.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !name.isEmpty else { return nil }
-            let safe = name.replacingOccurrences(of: "\"", with: "")
-            return "\"\(safe)\", \"Hiragino Sans\", sans-serif"
-        }
+    /// テーマの既定の詳細設定
+    func style(for themeID: String) -> ViewStyle {
+        themeStyles[themeID] ?? ViewStyle()
     }
 
-    func increaseFontScale() { fontScale = min(3.0, (fontScale * 10 + 1).rounded() / 10) }
-    func decreaseFontScale() { fontScale = max(0.5, (fontScale * 10 - 1).rounded() / 10) }
+    func setStyle(_ style: ViewStyle, for themeID: String) {
+        if style == ViewStyle() { themeStyles.removeValue(forKey: themeID) } else { themeStyles[themeID] = style }
+    }
 }

@@ -1,7 +1,7 @@
 {
   "name": "shiori-viewer",
   "private": true,
-  "version": "4.0.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Shiori のビューワー（WKWebView 内で動く Markdown レンダラ）",
   "scripts": {

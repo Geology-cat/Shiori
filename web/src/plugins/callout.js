@@ -1,5 +1,5 @@
 // 注記ブロック。GitHub Alerts / Obsidian Callout / MkDocs Admonition / ::: コンテナに対応する。
-import { escapeHtml } from '../util.js';
+import { escapeHtml, lineAttrs } from '../util.js';
 
 // 表記ゆれを色分けのグループへまとめる
 const KIND_GROUPS = {
@@ -172,8 +172,7 @@ export function containerCallout(md) {
         return token.meta?.details ? '</div></details>\n' : '</div></div>\n';
       }
       const { kind, rest } = parse(token.info);
-      const line = token.attrGet('data-line');
-      const lineAttr = line != null ? ` data-line="${line}"` : '';
+      const lineAttr = lineAttrs(token);
 
       if (kind === 'details') {
         token.meta = { details: true };
