@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Xcode / ビルド生成物
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.dmg
+*.app
+
+# Node（web/dist は Xcode ビルドに必要なのでコミットする）
+node_modules/
+
+# Claude Code のローカル設定
+.claude/settings.local.json
