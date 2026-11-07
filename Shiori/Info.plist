@@ -9,16 +9,6 @@
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
-			<key>CFBundleTypeExtensions</key>
-			<array>
-				<string>md</string>
-				<string>markdown</string>
-				<string>mdown</string>
-				<string>mkd</string>
-				<string>mdx</string>
-				<string>qmd</string>
-				<string>rmd</string>
-			</array>
 			<key>CFBundleTypeName</key>
 			<string>Markdown 書類</string>
 			<key>CFBundleTypeRole</key>
@@ -28,6 +18,7 @@
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>net.daringfireball.markdown</string>
+				<string>com.geologycat.shiori.markdown-variant</string>
 			</array>
 		</dict>
 		<dict>
@@ -91,6 +82,31 @@
 	<string>NSApplication</string>
 	<key>NSRemovableVolumesUsageDescription</key>
 	<string>外部ボリュームにある Markdown と画像を表示するために使います。</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>net.daringfireball.markdown</string>
+				<string>public.plain-text</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Markdown</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.geologycat.shiori.markdown-variant</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>mdown</string>
+					<string>mkd</string>
+					<string>mdx</string>
+					<string>qmd</string>
+					<string>rmd</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>
@@ -108,9 +124,6 @@
 				<array>
 					<string>md</string>
 					<string>markdown</string>
-					<string>mdown</string>
-					<string>mkd</string>
-					<string>mdx</string>
 				</array>
 				<key>public.mime-type</key>
 				<array>
