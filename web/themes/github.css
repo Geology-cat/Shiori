@@ -1,0 +1,80 @@
+/* GitHub 風テーマ: README を GitHub 上と近い見た目で確認したいとき用 */
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #59636e;
+  --faint: #818b98;
+  --accent: #0969da;
+  --rule: #d1d9e0;
+  --surface: #f6f8fa;
+  --code-bg: #f6f8fa;
+  --mark-bg: #fff8c5;
+
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, "Hiragino Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --theme-font-size: 16px;
+  --theme-line-height: 1.5;
+  --theme-measure: 56em;
+  --heading-weight: 600;
+
+  --hl-keyword: #cf222e;
+  --hl-string: #0a3069;
+  --hl-number: #0550ae;
+  --hl-comment: #6e7781;
+  --hl-function: #8250df;
+  --hl-type: #953800;
+  --hl-attr: #0550ae;
+
+  --callout-note: #0969da;
+  --callout-tip: #1a7f37;
+  --callout-important: #8250df;
+  --callout-warning: #9a6700;
+  --callout-danger: #d1242f;
+}
+
+:root[data-appearance="dark"] {
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --muted: #9198a1;
+  --faint: #6e7681;
+  --accent: #4493f8;
+  --rule: #3d444d;
+  --surface: #151b23;
+  --code-bg: #151b23;
+  --mark-bg: #5e4b00;
+
+  --hl-keyword: #ff7b72;
+  --hl-string: #a5d6ff;
+  --hl-number: #79c0ff;
+  --hl-comment: #8b949e;
+  --hl-function: #d2a8ff;
+  --hl-type: #ffa657;
+  --hl-attr: #79c0ff;
+
+  --callout-note: #4493f8;
+  --callout-tip: #3fb950;
+  --callout-important: #ab7df8;
+  --callout-warning: #d29922;
+  --callout-danger: #f85149;
+}
+
+.shiori-doc { padding-block: 2em 4em; }
+
+h1, h2 { padding-block-end: 0.3em; border-block-end: 1px solid var(--rule); }
+h1 { font-size: 2em; margin-block: 1.5em 1em; }
+h2 { font-size: 1.5em; margin-block: 1.5em 1em; }
+h3 { font-size: 1.25em; margin-block: 1.5em 1em; }
+h4 { font-size: 1em; margin-block: 1.5em 1em; }
+
+p, ul, ol, .table-wrap, .code-block, blockquote { margin-block-end: 1em; }
+code { font-size: 85%; border-radius: 6px; padding-block: 0.2em; padding-inline: 0.4em; }
+.code-block pre { font-size: 85%; border-radius: 6px; line-height: 1.45; padding: 1em; }
+blockquote { border-inline-start: 0.25em solid var(--rule); padding-inline-start: 1em; color: var(--muted); }
+th, td { padding-block: 6px; padding-inline: 13px; }
+tbody tr:nth-child(2n) { background: var(--surface); }
+th { background: transparent; }
+hr { border-block-start: 0.25em solid var(--rule); margin-block: 1.5em; }
+img { border-radius: 0; }
+
+.callout { background: transparent; border-radius: 0; padding-block: 0.5em; padding-inline: 1em; border-inline-start-width: 0.25em; }

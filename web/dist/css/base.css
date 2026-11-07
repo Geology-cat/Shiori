@@ -1,0 +1,694 @@
+/*
+  Shiori ビューワーの共通スタイル。
+  余白や罫線は論理プロパティ（margin-block / padding-inline など）で書く。
+  こうしておくと縦書きでも同じ指定がそのまま効く。
+
+  各テーマは変数だけを定義するのが基本（一覧は docs/themes.md）。
+*/
+
+:root {
+  /* テーマが上書きする変数の既定値 */
+  --bg: #ffffff;
+  --fg: #24292f;
+  --muted: #667085;
+  --faint: #98a2b3;
+  --accent: #4f5bd5;
+  --rule: #e4e7ec;
+  --surface: #f6f7f9;
+  --code-bg: #f4f5f7;
+  --code-fg: inherit;
+  --mark-bg: #fff1a8;
+  --mark-fg: inherit;
+  --selection: rgba(79, 91, 213, 0.22);
+
+  --font-body: -apple-system, "SF Pro Text", "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+  --font-heading: var(--font-body);
+  --font-mono: ui-monospace, "SF Mono", Menlo, "Hiragino Sans", monospace;
+
+  --theme-font-size: 16px;
+  --theme-line-height: 1.75;
+  --theme-measure: 44em;
+  --block-gap: 1em;
+  --heading-weight: 650;
+
+  /* コードの色分け */
+  --hl-keyword: #a626a4;
+  --hl-string: #2f7d4f;
+  --hl-number: #b35a00;
+  --hl-comment: #8a8f98;
+  --hl-function: #3457c9;
+  --hl-type: #0e7490;
+  --hl-attr: #b35a00;
+  --hl-deletion-bg: rgba(220, 53, 69, 0.12);
+  --hl-addition-bg: rgba(40, 167, 69, 0.14);
+
+  /* 注記の色 */
+  --callout-note: #3b82f6;
+  --callout-tip: #16a34a;
+  --callout-important: #7c3aed;
+  --callout-warning: #d97706;
+  --callout-danger: #dc2626;
+  --callout-question: #0891b2;
+  --callout-example: #7c3aed;
+  --callout-quote: #6b7280;
+  --callout-abstract: #0d9488;
+}
+
+:root[data-appearance="dark"] {
+  --bg: #1b1d21;
+  --fg: #d8dade;
+  --muted: #9aa0a9;
+  --faint: #6c727c;
+  --accent: #a3acf5;
+  --rule: #33363c;
+  --surface: #24272c;
+  --code-bg: #24272c;
+  --mark-bg: #6b5a14;
+  --mark-fg: #fff6cf;
+  --selection: rgba(163, 172, 245, 0.28);
+
+  --hl-keyword: #d19ad6;
+  --hl-string: #8ccf9d;
+  --hl-number: #e5a56b;
+  --hl-comment: #7b818b;
+  --hl-function: #8fb0f5;
+  --hl-type: #6fc8d8;
+  --hl-attr: #e5a56b;
+  --hl-deletion-bg: rgba(248, 81, 73, 0.18);
+  --hl-addition-bg: rgba(63, 185, 80, 0.18);
+
+  --callout-note: #6aa5fb;
+  --callout-tip: #4ccb7a;
+  --callout-important: #a78bfa;
+  --callout-warning: #eda83f;
+  --callout-danger: #f26d6d;
+  --callout-question: #38bdd8;
+  --callout-example: #a78bfa;
+  --callout-quote: #9ca3af;
+  --callout-abstract: #34c2b3;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  block-size: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+body { -webkit-text-size-adjust: 100%; }
+
+::selection { background: var(--selection); }
+
+/* 読書の進み具合（ごく細い線） */
+#progress {
+  position: fixed;
+  z-index: 10;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 100%;
+  block-size: 2px;
+  transform-origin: left center;
+  transform: scaleX(var(--progress, 0));
+  background: var(--accent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+:root[data-writing="vertical"] #progress { transform-origin: right center; }
+
+#scroller {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* ------------------------------------------------------------
+   本文
+   ------------------------------------------------------------ */
+
+.shiori-doc {
+  font-family: var(--user-font, var(--font-body));
+  font-size: calc(var(--theme-font-size) * var(--user-scale, 1));
+  line-height: var(--user-line-height, var(--theme-line-height));
+  inline-size: min(100%, var(--user-measure, var(--theme-measure)));
+  margin-inline: auto;
+  padding-block: 2.5em 5em;
+  padding-inline: 2.25em;
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-break: strict;
+  hanging-punctuation: allow-end;
+  text-spacing-trim: normal;
+  text-autospace: normal;
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 空の状態でスクロールバーを出さない */
+.shiori-doc:empty { padding: 0; }
+
+[data-line], h1, h2, h3, h4, h5, h6 { scroll-margin-block-start: 1.5rem; }
+
+:root[data-justify="on"] .shiori-doc :is(p, li, dd, blockquote) { text-align: justify; }
+
+:root[data-indent="on"] .shiori-doc > p + p { text-indent: 1em; }
+:root[data-indent="on"] .shiori-doc > p + p:has(> br:first-child) { text-indent: 0; }
+
+.shiori-doc > :first-child { margin-block-start: 0; }
+.shiori-doc > :last-child { margin-block-end: 0; }
+
+p { margin-block: 0 var(--block-gap); }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 0.15em; }
+
+strong { font-weight: 650; }
+em.bouten {
+  font-style: normal;
+  text-emphasis: filled sesame;
+  -webkit-text-emphasis: filled sesame;
+}
+
+del, s { color: var(--muted); }
+ins { text-decoration: none; border-block-end: 1.5px solid var(--callout-tip); }
+mark { background: var(--mark-bg); color: var(--mark-fg); padding-inline: 0.15em; border-radius: 2px; }
+abbr[title] { text-decoration: underline dotted; text-underline-offset: 0.2em; cursor: help; }
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  padding-block: 0.05em;
+  padding-inline: 0.4em;
+  border: 1px solid var(--rule);
+  border-block-end-width: 2px;
+  border-radius: 4px;
+  background: var(--surface);
+}
+sup, sub { line-height: 0; font-size: 0.72em; }
+
+ruby { ruby-align: center; }
+rt { font-size: 0.5em; color: var(--muted); font-feature-settings: "ruby" 1; }
+
+/* 見出し */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+  line-height: 1.35;
+  margin-block: 1.8em 0.6em;
+  break-after: avoid;
+  text-align: start;
+  text-indent: 0;
+}
+h1 { font-size: 1.75em; margin-block-start: 1.4em; }
+h2 { font-size: 1.4em; }
+h3 { font-size: 1.18em; }
+h4 { font-size: 1em; }
+h5 { font-size: 0.92em; }
+h6 { font-size: 0.86em; color: var(--muted); }
+
+/* 見出しの自動番号（環境設定でオン） */
+:root[data-heading-numbers="on"] .shiori-doc { counter-reset: h2; }
+:root[data-heading-numbers="on"] .shiori-doc h2 { counter-reset: h3; counter-increment: h2; }
+:root[data-heading-numbers="on"] .shiori-doc h3 { counter-reset: h4; counter-increment: h3; }
+:root[data-heading-numbers="on"] .shiori-doc h4 { counter-increment: h4; }
+:root[data-heading-numbers="on"] .shiori-doc h2::before { content: counter(h2) "\2003"; }
+:root[data-heading-numbers="on"] .shiori-doc h3::before { content: counter(h2) "." counter(h3) "\2003"; }
+:root[data-heading-numbers="on"] .shiori-doc h4::before { content: counter(h2) "." counter(h3) "." counter(h4) "\2003"; }
+
+/* 表題ブロック（フロントマターの title / author / date / abstract） */
+.doc-header { margin-block-end: 2.2em; }
+.doc-title { margin-block: 0 0.4em; font-size: 1.9em; }
+.doc-author, .doc-date { margin-block: 0; color: var(--muted); font-size: 0.95em; }
+.doc-abstract {
+  margin-block: 1.4em 0;
+  padding-inline: 1.5em;
+  font-size: 0.94em;
+  color: var(--muted);
+}
+
+/* プロパティ（フロントマターの残り） */
+.properties {
+  margin-block: 0 2em;
+  font-size: 0.85em;
+  color: var(--muted);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding-block: 0.5em;
+  padding-inline: 0.9em;
+}
+.properties summary { cursor: pointer; user-select: none; }
+.properties[open] summary { margin-block-end: 0.5em; }
+.properties table { border-collapse: collapse; font-size: 1em; display: table; margin: 0; }
+.properties th, .properties td {
+  border: 0;
+  background: none;
+  padding-block: 0.15em;
+  padding-inline: 0 1.2em;
+  text-align: start;
+  font-weight: 400;
+  vertical-align: top;
+}
+.properties th { color: var(--faint); white-space: nowrap; }
+.properties pre { margin: 0; white-space: pre-wrap; font-size: 0.95em; }
+
+/* リスト */
+ul, ol { margin-block: 0 var(--block-gap); padding-inline-start: 1.6em; }
+li { margin-block: 0.25em; }
+li > ul, li > ol { margin-block: 0.25em 0; }
+li > p { margin-block: 0.4em; }
+li::marker { color: var(--muted); }
+
+/* タスク */
+.task-list { list-style: none; padding-inline-start: 0.3em; }
+.task-list .task-list { padding-inline-start: 1.5em; }
+.task-item { position: relative; }
+.task-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  inline-size: 1.05em;
+  block-size: 1.05em;
+  margin: 0;
+  margin-inline-end: 0.55em;
+  vertical-align: -0.16em;
+  border: 1.5px solid var(--faint);
+  border-radius: 4px;
+  cursor: pointer;
+  background: transparent;
+  position: relative;
+}
+.task-checkbox:hover { border-color: var(--accent); }
+.task-checkbox:checked { background: var(--accent); border-color: var(--accent); }
+.task-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 0.08em;
+  inset-inline-start: 0.28em;
+  inline-size: 0.28em;
+  block-size: 0.55em;
+  border: solid var(--bg);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.task-item[data-task="done"] > :not(ul, ol) { color: var(--muted); }
+.task-item[data-task="done"] { text-decoration-color: var(--faint); }
+.task-item[data-task="doing"] > .task-checkbox { background: linear-gradient(135deg, var(--accent) 50%, transparent 50%); border-color: var(--accent); }
+.task-item[data-task="cancelled"] { color: var(--muted); text-decoration: line-through; }
+
+/* 定義リスト */
+dl { margin-block: 0 var(--block-gap); }
+dt { font-weight: 650; margin-block-start: 0.6em; }
+dd { margin-inline-start: 1.6em; margin-block: 0.2em; }
+dd > p { margin-block: 0.2em; }
+
+/* 引用 */
+blockquote {
+  margin-block: 0 var(--block-gap);
+  margin-inline: 0;
+  padding-inline-start: 1.1em;
+  border-inline-start: 3px solid var(--rule);
+  color: var(--muted);
+}
+blockquote > :last-child { margin-block-end: 0; }
+
+hr {
+  border: 0;
+  border-block-start: 1px solid var(--rule);
+  margin-block: 2.2em;
+}
+
+/* インラインコード */
+code {
+  font-family: var(--user-code-font, var(--font-mono));
+  font-size: 0.86em;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding-block: 0.12em;
+  padding-inline: 0.36em;
+  border-radius: 4px;
+}
+
+/* コードブロック */
+.code-block { position: relative; margin-block: 0 var(--block-gap); }
+.code-block pre {
+  margin: 0;
+  overflow: auto;
+  padding-block: 0.9em;
+  padding-inline: 1.1em;
+  background: var(--code-bg);
+  border-radius: 8px;
+  line-height: 1.55;
+  font-size: 0.88em;
+  tab-size: 4;
+}
+.code-block code {
+  background: none;
+  padding: 0;
+  font-size: 1em;
+  border-radius: 0;
+  display: block;
+  white-space: pre;
+}
+.code-label {
+  font-family: var(--font-mono);
+  font-size: 0.72em;
+  color: var(--faint);
+  position: absolute;
+  inset-block-start: 0.5em;
+  inset-inline-end: 0.8em;
+  user-select: none;
+  transition: opacity 0.12s;
+}
+.code-block.has-title { border-radius: 8px; overflow: hidden; }
+.code-block.has-title .code-label {
+  position: static;
+  display: block;
+  color: var(--muted);
+  background: var(--code-bg);
+  border-block-end: 1px solid var(--rule);
+  padding-block: 0.4em;
+  padding-inline: 1.1em;
+  font-size: 0.78em;
+}
+.code-block.has-title pre { border-start-start-radius: 0; border-start-end-radius: 0; }
+.copy-btn {
+  position: absolute;
+  inset-block-start: 0.4em;
+  inset-inline-end: 0.5em;
+  font: 500 11px -apple-system, "Hiragino Sans", sans-serif;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding-block: 0.2em;
+  padding-inline: 0.6em;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.code-block:hover .copy-btn { opacity: 1; }
+.code-block:not(.has-title):hover .code-label { opacity: 0; }
+.copy-btn:hover { color: var(--fg); }
+
+/* コードの色分け（highlight.js のクラス） */
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-doctag, .hljs-meta .hljs-keyword { color: var(--hl-keyword); }
+.hljs-string, .hljs-regexp, .hljs-addition, .hljs-meta .hljs-string { color: var(--hl-string); }
+.hljs-number, .hljs-symbol, .hljs-bullet { color: var(--hl-number); }
+.hljs-comment, .hljs-quote { color: var(--hl-comment); font-style: italic; }
+.hljs-title, .hljs-section, .hljs-name, .hljs-title.function_ { color: var(--hl-function); }
+.hljs-type, .hljs-built_in, .hljs-title.class_, .hljs-class .hljs-title { color: var(--hl-type); }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-selector-class, .hljs-selector-id { color: var(--hl-attr); }
+.hljs-deletion { background: var(--hl-deletion-bg); }
+.hljs-addition { background: var(--hl-addition-bg); }
+.hljs-strong { font-weight: 700; }
+.hljs-emphasis { font-style: italic; }
+
+/* 表 */
+.table-wrap {
+  overflow-x: auto;
+  margin-block: 0 calc(var(--block-gap) * 1.2);
+  max-inline-size: 100%;
+}
+table {
+  border-collapse: collapse;
+  font-size: 0.93em;
+  line-height: 1.5;
+  min-inline-size: 40%;
+}
+caption {
+  caption-side: top;
+  text-align: start;
+  font-size: 0.92em;
+  color: var(--muted);
+  padding-block-end: 0.5em;
+}
+th, td {
+  border: 1px solid var(--rule);
+  padding-block: 0.4em;
+  padding-inline: 0.75em;
+  vertical-align: top;
+  text-align: start;
+}
+th { font-weight: 650; background: var(--surface); }
+
+/* 画像と図 */
+img { max-inline-size: 100%; block-size: auto; border-radius: 3px; cursor: zoom-in; }
+figure {
+  margin-block: 1.4em;
+  margin-inline: 0;
+  text-align: center;
+}
+figure img { display: block; margin-inline: auto; max-block-size: 75vh; object-fit: contain; }
+figure.figure-group { display: flex; flex-wrap: wrap; gap: 0.75em; justify-content: center; }
+figure.figure-group img { margin: 0; max-inline-size: 48%; }
+figure.figure-group figcaption { flex-basis: 100%; }
+figcaption {
+  margin-block-start: 0.65em;
+  font-size: 0.88em;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* 数式 */
+.math-block {
+  display: block;
+  margin-block: 1em;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.25em;
+}
+.math-block .katex-display { margin: 0; }
+.katex { font-size: 1.05em; }
+.katex-error { color: var(--callout-danger) !important; }
+
+/* mermaid */
+.diagram { margin-block: 1.4em; text-align: center; overflow-x: auto; }
+.diagram svg { max-inline-size: 100%; block-size: auto; }
+.diagram-src { display: none; }
+.diagram-error {
+  text-align: start;
+  white-space: pre-wrap;
+  color: var(--callout-danger);
+  background: var(--code-bg);
+  padding: 1em;
+  border-radius: 8px;
+  font-size: 0.85em;
+}
+
+/* 注記 */
+.callout {
+  --c: var(--callout-note);
+  margin-block: 0 var(--block-gap);
+  padding-block: 0.7em;
+  padding-inline: 1em;
+  border-inline-start: 3px solid var(--c);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--c) 8%, transparent);
+  text-indent: 0;
+}
+.callout[data-callout="tip"] { --c: var(--callout-tip); }
+.callout[data-callout="important"] { --c: var(--callout-important); }
+.callout[data-callout="warning"] { --c: var(--callout-warning); }
+.callout[data-callout="danger"] { --c: var(--callout-danger); }
+.callout[data-callout="question"] { --c: var(--callout-question); }
+.callout[data-callout="example"] { --c: var(--callout-example); }
+.callout[data-callout="quote"] { --c: var(--callout-quote); }
+.callout[data-callout="abstract"] { --c: var(--callout-abstract); }
+.callout-title { font-weight: 650; color: var(--c); }
+summary.callout-title { cursor: pointer; user-select: none; }
+.callout-body { margin-block-start: 0.35em; }
+.callout-body > :last-child { margin-block-end: 0; }
+details.callout:not([open]) .callout-body { display: none; }
+
+details:not(.callout):not(.properties) { margin-block: 0 var(--block-gap); }
+details:not(.callout):not(.properties) > summary { cursor: pointer; }
+
+/* 目次 */
+.toc {
+  margin-block: 0 2em;
+  padding-block: 0.8em;
+  padding-inline: 1.2em;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-size: 0.93em;
+}
+.toc-title { font-weight: 650; margin-block: 0 0.4em; }
+.toc ul { list-style: none; margin: 0; padding: 0; }
+.toc li { margin-block: 0.15em; }
+.toc a { color: inherit; }
+.toc-l2 { padding-inline-start: 1em; }
+.toc-l3 { padding-inline-start: 2em; }
+.toc-l4, .toc-l5, .toc-l6 { padding-inline-start: 3em; }
+
+/* 脚注 */
+.footnotes {
+  margin-block-start: 3em;
+  padding-block-start: 1em;
+  border-block-start: 1px solid var(--rule);
+  font-size: 0.88em;
+  color: var(--muted);
+}
+.footnotes-list { padding-inline-start: 1.4em; margin: 0; }
+.footnotes-list p { margin: 0; }
+.footnote-ref a { padding-inline: 0.1em; }
+.footnote-backref { margin-inline-start: 0.3em; }
+
+/* タグ・Wiki リンク */
+.tag {
+  font-size: 0.85em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  padding-block: 0.08em;
+  padding-inline: 0.5em;
+  border-radius: 999px;
+}
+.wikilink { text-decoration: underline dotted; text-underline-offset: 0.18em; }
+.wiki-missing { color: var(--faint); text-decoration: line-through; }
+.embed {
+  margin-block: 0 var(--block-gap);
+  padding-inline-start: 1em;
+  border-inline-start: 2px solid var(--accent);
+}
+.embed-title {
+  display: block;
+  font-size: 0.82em;
+  margin-block-end: 0.4em;
+  color: var(--muted);
+}
+
+/* 検索の強調 */
+::highlight(shiori-find) { background: color-mix(in srgb, var(--mark-bg) 75%, transparent); }
+::highlight(shiori-find-current) { background: #ff9f43; color: #1b1d21; }
+
+/* 画像ファイルの表示 */
+.image-mode { inline-size: 100%; block-size: 100%; padding: 0; margin: 0; }
+.image-view {
+  inline-size: 100%;
+  block-size: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5em;
+}
+.image-view img {
+  max-inline-size: 100%;
+  max-block-size: 100%;
+  object-fit: contain;
+  cursor: zoom-in;
+  box-shadow: 0 1px 12px rgba(0, 0, 0, 0.14);
+}
+.image-view.actual-size { display: block; block-size: auto; inline-size: max-content; }
+.image-view.actual-size img { max-inline-size: none; max-block-size: none; cursor: zoom-out; }
+
+/* 拡大表示 */
+#lightbox {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2vmin;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(6px);
+  cursor: zoom-out;
+}
+#lightbox[hidden] { display: none; }
+#lightbox img { max-inline-size: 100%; max-block-size: 100%; object-fit: contain; }
+
+/* ------------------------------------------------------------
+   縦書き
+   ------------------------------------------------------------ */
+
+:root[data-writing="vertical"] #scroller { writing-mode: vertical-rl; }
+
+:root[data-writing="vertical"] .shiori-doc {
+  /* 行の長さ（字数）は窓の高さに収める */
+  inline-size: min(100%, var(--user-measure, var(--theme-measure)));
+  block-size: auto;
+  min-block-size: 100%;
+  padding-block: 3em 3em;
+  padding-inline: 2.5em;
+  text-orientation: mixed;
+}
+
+/* 縦中横 */
+:root[data-writing="vertical"] .tcy { text-combine-upright: all; -webkit-text-combine: horizontal; }
+
+/* 欧文の見出しや強調のベースライン調整 */
+:root[data-writing="vertical"] sup,
+:root[data-writing="vertical"] sub { text-orientation: mixed; }
+
+/* 傍点は右側に打つ */
+:root[data-writing="vertical"] em.bouten { text-emphasis-position: over right; -webkit-text-emphasis-position: over right; }
+
+/* 斜体は縦組みで読みにくいので傍点相当に置き換えない範囲でそのまま正体にする */
+:root[data-writing="vertical"] .shiori-doc em:not(.bouten) {
+  font-style: normal;
+  text-emphasis: filled dot;
+  -webkit-text-emphasis: filled dot;
+  text-emphasis-position: over right;
+  -webkit-text-emphasis-position: over right;
+}
+
+/*
+  コード・表・数式・図は横組みのまま「島」として置く。
+  親が縦組みなので、ここだけ物理プロパティで大きさを決める。
+*/
+:root[data-writing="vertical"] .code-block,
+:root[data-writing="vertical"] .table-wrap,
+:root[data-writing="vertical"] .math-block,
+:root[data-writing="vertical"] .diagram,
+:root[data-writing="vertical"] .properties,
+:root[data-writing="vertical"] .toc,
+:root[data-writing="vertical"] figure {
+  writing-mode: horizontal-tb;
+  width: fit-content;
+  max-width: min(70vw, 46em);
+  max-height: calc(100vh - 6em);
+  margin: 0 1.5em;
+  overflow: auto;
+}
+:root[data-writing="vertical"] figure { overflow: visible; }
+:root[data-writing="vertical"] figure img { max-height: calc(100vh - 10em); max-width: min(70vw, 46em); }
+:root[data-writing="vertical"] .diagram svg { max-height: calc(100vh - 7em); }
+:root[data-writing="vertical"] .code-block pre { max-height: calc(100vh - 7em); padding-inline-end: 5em; }
+
+/* 段落中の数式は正立させる */
+:root[data-writing="vertical"] .math-inline {
+  writing-mode: horizontal-tb;
+  display: inline-block;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+:root[data-writing="vertical"] .math-block-inline { display: block; }
+
+/* 段落内のインラインコードは欧文として横倒しのまま読む */
+:root[data-writing="vertical"] code { text-orientation: mixed; }
+
+:root[data-writing="vertical"] img:not(figure img) { max-block-size: 100%; max-inline-size: 100%; }
+
+:root[data-writing="vertical"] .callout,
+:root[data-writing="vertical"] blockquote { margin-inline: 0; }
+
+:root[data-writing="vertical"] .image-mode { writing-mode: horizontal-tb; }
+
+/* ------------------------------------------------------------
+   印刷・PDF
+   ------------------------------------------------------------ */
+
+@media print {
+  html, body { overflow: visible; block-size: auto; background: #fff; }
+  #scroller { position: static; overflow: visible; }
+  #progress, #lightbox, .copy-btn { display: none !important; }
+  .shiori-doc { inline-size: auto; max-inline-size: none; padding: 0; }
+  .code-block, table, figure, .math-block, .diagram, .callout, blockquote { break-inside: avoid; }
+  .code-block pre { white-space: pre-wrap; overflow: visible; }
+  .code-block code { white-space: pre-wrap; }
+  .table-wrap, .math-block, .diagram { overflow: visible; }
+  a { color: inherit; }
+  details.callout .callout-body { display: block !important; }
+  .properties { display: none; }
+}

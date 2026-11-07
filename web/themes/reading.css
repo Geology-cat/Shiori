@@ -1,0 +1,93 @@
+/*
+  読書テーマ
+  長い文章を疲れずに読むための組版。紙の色、明朝、広めの行間、短めの行長。
+  縦書きでもそのまま読めるよう、指定はすべて論理プロパティで書く。
+*/
+:root {
+  --bg: #f6f1e5;
+  --fg: #2c2720;
+  --muted: #7a7062;
+  --faint: #a89e8c;
+  --accent: #8a5a2b;
+  --rule: #dcd3bf;
+  --surface: #efe8d7;
+  --code-bg: #eee6d3;
+  --mark-bg: #efdc9c;
+  --selection: rgba(138, 90, 43, 0.22);
+
+  --font-body: "Hiragino Mincho ProN", "YuMincho", "Iowan Old Style", "Palatino", serif;
+  --font-heading: var(--font-body);
+
+  --theme-font-size: 18px;
+  --theme-line-height: 2;
+  --theme-measure: 35em;
+  --block-gap: 1em;
+  --heading-weight: 600;
+}
+
+:root[data-appearance="dark"] {
+  --bg: #191816;
+  --fg: #c9c2b4;
+  --muted: #8e8778;
+  --faint: #635e53;
+  --accent: #c79a68;
+  --rule: #35322c;
+  --surface: #23211d;
+  --code-bg: #23211d;
+  --mark-bg: #5c4c1c;
+  --selection: rgba(199, 154, 104, 0.26);
+}
+
+.shiori-doc {
+  padding-block: 4em 7em;
+  font-feature-settings: "kern";
+}
+.shiori-doc :is(p, li, dd) { text-align: justify; }
+
+/* 欧文のみの文書では少し行間を詰める */
+:root[data-lang="en"] .shiori-doc { line-height: var(--user-line-height, 1.7); hyphens: auto; }
+
+h1, h2, h3, h4 { font-feature-settings: "palt"; letter-spacing: 0.02em; }
+h1 { font-size: 1.6em; margin-block: 2.4em 1.4em; text-align: center; font-weight: 500; }
+h2 { font-size: 1.28em; margin-block: 2.6em 1.1em; font-weight: 600; }
+h3 { font-size: 1.08em; margin-block: 2em 0.8em; font-weight: 600; }
+h4, h5, h6 { font-size: 1em; margin-block: 1.6em 0.5em; font-weight: 600; }
+.shiori-doc > h1:first-child { margin-block-start: 0.5em; }
+
+/* 表題ブロック */
+.doc-header { text-align: center; margin-block-end: 4em; }
+.doc-title { font-size: 1.8em; font-weight: 500; letter-spacing: 0.06em; }
+.doc-author { margin-block-start: 1.2em; letter-spacing: 0.1em; }
+.doc-abstract { margin-block-start: 2em; text-align: start; }
+
+/* 場面転換の区切り */
+hr { border: 0; margin-block: 3em; text-align: center; overflow: visible; }
+hr::after { content: "＊　＊　＊"; color: var(--faint); font-size: 0.85em; }
+
+blockquote { border-inline-start: 0; padding-inline-start: 2em; color: inherit; }
+
+a { color: var(--accent); }
+rt { font-feature-settings: "ruby" 1; color: inherit; opacity: 0.75; }
+
+/* 図表やコードは本文の流れに溶け込ませる */
+figcaption { font-size: 0.82em; }
+.code-block pre { background: var(--code-bg); border-radius: 4px; }
+code { font-size: 0.82em; }
+.callout { background: var(--surface); border-radius: 4px; }
+th { background: transparent; }
+th, td { border-color: var(--rule); }
+
+.footnotes { font-size: 0.85em; border-block-start-color: var(--rule); }
+
+/* 縦書きでは行間をやや詰め、見出しを天に寄せる */
+:root[data-writing="vertical"] .shiori-doc {
+  line-height: var(--user-line-height, 1.95);
+  padding-block: 3.5em 4em;
+}
+:root[data-writing="vertical"] h1 { text-align: start; margin-block: 2em 1.2em; }
+:root[data-writing="vertical"] .doc-header { text-align: start; margin-block-end: 3em; }
+:root[data-writing="vertical"] hr { margin-block: 2.5em; }
+
+@media print {
+  :root { --bg: #fff; --theme-font-size: 11pt; }
+}

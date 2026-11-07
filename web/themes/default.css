@@ -1,0 +1,9 @@
+/* 標準テーマ: 普段のノートや技術文書向け。base.css の既定値を少し整えるだけ */
+:root {
+  --theme-font-size: 16px;
+  --theme-line-height: 1.8;
+  --theme-measure: 46em;
+}
+
+h1 { letter-spacing: -0.005em; }
+h2 { padding-block-end: 0.25em; border-block-end: 1px solid var(--rule); }

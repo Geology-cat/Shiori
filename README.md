@@ -1,145 +1,85 @@
-# Markdown Editor V3
+# Shiori
 
-macOS 用の軽量な GitHub Flavored Markdown エディタです。
-左にソースエディタ、右にライブプレビュー (KaTeX + mermaid 対応) の 2 ペイン構成。
+Finder の Markdown をそのまま読み、そのまま書くための macOS アプリ。
 
-**V3 では pandoc / TeX Live への依存を完全に除去し、外部ツール不要で PDF・HTML エクスポートが可能です。**
-さらに本リビジョンでプレビュー描画を再設計し、編集中の RAM 消費とピークメモリを抑えました。
+Obsidian のように閲覧と編集を 1 ペインで切り替えられますが、Vault を作る必要はありません。Finder で md をダブルクリックすれば、そのフォルダがサイドバーに開きます。縦書きや読書向けのデザインもあり、長い文章を読むのにも使えます。
 
----
+## 特徴
 
-## 主な機能
+**1 ペインで閲覧と編集を切り替え**
+ボタンか ⌘E で切り替えます。切り替えても同じ箇所が見えたままです。md を開いたときのモードは環境設定で選べます。
 
-- **GitHub Flavored Markdown** (表 / タスクリスト / 取り消し線 / コードブロック)
-- **数式レンダリング**: `$y = x^2$` / `$$e = mc^2$$` を KaTeX で即時プレビュー
-- **化学式 (mhchem)**: `$\ce{H2O}$` / `$\ce{NaOH + HCl -> NaCl + H2O}$`
-- **mermaid 図**: ` ```mermaid ` フェンス内のフローチャート・シーケンス図などを描画
-- **ライブプレビュー**: 入力に追従して即時更新 (HSplitView でペイン幅変更可)
-- **PDF 書き出し**: ⌘⇧E で PDF として書き出し (外部ツール不要)
-- **HTML 書き出し**: ⌘⇧H で自己完結 HTML を書き出し (KaTeX + mermaid 付き)
-- **オフライン対応**: KaTeX・mermaid のアセットをアプリにバンドル同梱
-- **ドキュメントベース**: ⌘N / ⌘O / ⌘S / 別名で保存
-- **.md / .markdown / .mdown / .mkd 拡張子**を関連付け
+**サイドパネルのファイラー**
+フォルダ、Markdown、画像だけを表示します。新規作成、名前の変更、ゴミ箱、ドラッグでの移動ができ、外部での変更にも自動で追従します。目次パネルでは今読んでいる見出しが分かります。
 
-## パフォーマンス最適化 (本リビジョン)
+**読むためのビューワー**
 
-プレビューは WKWebView 上で動作します。従来は編集のたびにページ全体を再ロードし、
-3.2 MB の `mermaid.min.js` や KaTeX を毎回パースし直していたため、メモリが常時上下していました。
-本リビジョンで以下を改善しています。
+- 縦書きと横書きの切替（ルビ、傍点、縦中横に対応。表や数式は横組みのまま）
+- テーマ: 標準 / 科学文書 / 読書 / GitHub。自前の CSS も使えます（[作り方](docs/themes.md)）
+- 文字サイズ、行間、本文幅、書体の調整
+- 読書位置の記憶、進み具合の表示、本文の検索、画像の拡大
+- ファイルごとにテーマと組方向を固定
 
-| 項目 | 変更前 | 変更後 |
-|------|--------|--------|
-| プレビュー更新 | 毎回ページ全体を再ロード | 初回のみ全ロード、以降は本文 DOM だけを差し替え |
-| 重いスクリプト | 常に KaTeX + mermaid を読み込み | 数式 / mermaid を含む文書でのみ読み込み |
-| 未使用依存 | MarkdownUI (+ NetworkImage) をリンク | 削除し swift-markdown のみに整理 |
-| デッドコード | 未使用の AttributedRenderer を同梱 | 削除 |
+**だいたいどんな記法でも表示**
 
-機能・出力結果は変わりません。
+| 種類 | 対応する記法 |
+|------|------|
+| 標準 | CommonMark、GFM（表、タスク、取り消し線、自動リンク、Alerts） |
+| 学術 | 数式（`$`, `$$`, `\(`, `\[`, ` ```math `）、化学式（mhchem）、脚注、図表の番号とキャプション、mermaid |
+| Obsidian | コールアウト、`[[Wiki リンク]]`、`![[埋め込み]]`、`==マーカー==`、`%%コメント%%`、`#タグ`、画像サイズ指定 |
+| 拡張 | 定義リスト、上付き / 下付き、略語、絵文字、属性 `{.class}`、`[[toc]]`、YAML フロントマター |
+| 他サービス | MkDocs の `!!! note`、Qiita / Zenn の `:::`、コードブロックのファイル名 |
+| 日本語 | ルビ `｜漢字《かんじ》` `{漢字\|かんじ}`、傍点 `《《強調》》` |
 
-## V2 → V3 の主な変更点
+**軽いエディタ**
+構文ハイライト、リストの自動継続、書式の挿入、画像の貼り付け（`assets/` へ保存）、自動保存。Shift_JIS や CRLF のファイルも、文字コードと改行を保ったまま編集できます。
 
-| 項目 | V2 | V3 |
-|------|------|------|
-| PDF 書き出し | pandoc + xelatex (外部ツール必須) | WKWebView (外部ツール不要) |
-| HTML 書き出し | なし | ⌘⇧H で対応 |
-| 数式 / mermaid | CDN 必須 | バンドル同梱 (オフライン対応) |
-| App Sandbox | 無効 | 有効 (セキュリティ強化) |
-| TeX Live | 必須 (4〜7 GB) | 不要 |
-
-## 動作環境
-
-- macOS 13.0 (Ventura) 以降
-- ユニバーサルバイナリ (Intel + Apple Silicon)
+**書き出し**
+PDF、HTML（画像を埋め込んだ 1 ファイル）、印刷。外部ツールは不要です。
 
 ## インストール
 
-1. DMG を開く
-2. `MarkdownEditor.app` を `Applications` フォルダにドラッグ
-3. 初回起動時に Gatekeeper の警告が出る場合があります
-   → `Applications` の MarkdownEditor を **右クリック → 開く** で許可
+[Releases](../../releases) から DMG をダウンロードし、`Shiori.app` を Applications へドラッグしてください。
 
-## 使い方
+署名はしていますが公証はしていないため、初回は右クリックから「開く」を選ぶ必要があります。動作環境は macOS 14 以降です。
 
-1. アプリを起動 → 空のドキュメントウィンドウが開きます
-2. **左ペイン (ソース)** に Markdown を入力
-3. **右ペイン (プレビュー)** に即座にレンダリング結果が表示されます
-4. `⌘S` でファイル保存
-5. `⌘⇧E` で PDF として書き出し
-6. `⌘⇧H` で HTML として書き出し
+## キーボード操作
 
-### キーボードショートカット
+| 操作 | キー |
+|------|------|
+| 閲覧 / 編集の切替 | ⌘E |
+| サイドバーの表示 / 非表示 | ⌘\\ |
+| ファイル / 目次パネル | ⌥⌘1 / ⌥⌘2 |
+| 開く / クイックオープン | ⌘O / ⇧⌘P |
+| 新規タブ / タブを閉じる | ⌘N / ⌘W |
+| タブの移動 | ⌘1〜9、⇧⌘[ / ⇧⌘] |
+| 戻る / 進む | ⌘[ / ⌘] |
+| 文字サイズ | ⌘+ / ⌘- / ⌘0 |
+| 縦書きの切替 | ⌥⌘V |
+| 検索 | ⌘F、⌘G / ⇧⌘G |
+| 集中モード | ⌥⌘F |
+| PDF / HTML の書き出し | ⇧⌘E / ⇧⌘H |
+| 環境設定 | ⌘, |
 
-| ショートカット | 動作 |
-|----------------|------|
-| `⌘N` | 新規ドキュメント |
-| `⌘O` | 開く |
-| `⌘S` | 保存 |
-| `⌘⇧S` | 別名で保存 |
-| `⌘⇧E` | PDF として書き出す |
-| `⌘⇧H` | HTML として書き出す |
-| `⌘Q` | アプリ終了 |
+閲覧中はスペースとページキーで 1 画面ずつ進みます。縦書きでは左右の矢印キーでも送れます。
 
-### 数式の書き方
+## ビルド
 
-```markdown
-インライン数式: $y = x^2$, $\alpha + \beta$
-ブロック数式:
-$$
-\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}
-$$
-化学式: $\ce{NaOH + HCl -> NaCl + H2O}$
+Xcode 16 以降が必要です。ビューワーのビルド結果（`web/dist`）はリポジトリに含まれているので、Xcode だけでビルドできます。
+
+```bash
+make run
 ```
 
-### mermaid 図
+ビューワーを変更するときは Node.js も必要です。
 
-````markdown
-```mermaid
-graph TD
-    A[開始] --> B{条件}
-    B -->|Yes| C[処理]
-    B -->|No| D[終了]
-```
-````
-
-```mermaid
-graph TD
-    A[開始] --> B{条件}
-    B -->|Yes| C[処理]
-    B -->|No| D[終了]
+```bash
+make web
+make test
 ```
 
-## アーキテクチャ概要
+構成や設計の詳細は [CLAUDE.md](CLAUDE.md)、経緯は [開発履歴.md](開発履歴.md) にあります。
 
-| ファイル | 役割 |
-|----------|------|
-| `MarkdownEditorApp.swift` | アプリ本体 (DocumentGroup) とメニューコマンド |
-| `ContentView.swift` | 2 ペイン構成・ツールバー・エクスポート起動 |
-| `MarkdownTextView.swift` / `SourceEditor.swift` | NSTextView ベースのソースエディタ |
-| `EditorBridge.swift` | ツールバーから NSTextView への編集操作の橋渡し |
-| `MarkdownToolbar.swift` | 記法挿入ボタンと表挿入シート |
-| `HTMLRenderer.swift` | swift-markdown の AST → HTML 本文への変換 |
-| `PreviewView.swift` | WKWebView プレビュー (差分更新・条件付きスクリプト読込) と HTML 生成 |
-| `PDFExporter.swift` / `HTMLExporter.swift` | PDF / HTML エクスポート |
-| `FrontMatter.swift` | 先頭 YAML フロントマターの除去 |
-| `MarkdownDocument.swift` | FileDocument 実装 |
+## ライセンス
 
-> プレビューは初回のみ骨組み HTML を `loadHTMLString` で読み込み、以降は
-> `applyMarkdown(html)` で本文 DOM のみを差し替えます。新たに数式 / mermaid が
-> 必要になった場合だけ一度再ロードします。
-
-## ビルド方法
-
-```sh
-xcodebuild -project MarkdownEditor.xcodeproj \
-           -scheme MarkdownEditor \
-           -configuration Release \
-           build
-```
-
-生成された `MarkdownEditor.app` をそのまま起動できます。
-
-## 使用しているライブラリ・ツール
-
-- [swift-markdown](https://github.com/swiftlang/swift-markdown) — cmark-gfm ベースのパーサ (Markdown → HTML 変換に使用)
-- [KaTeX](https://katex.org) — 数式レンダリング (バンドル同梱)
-- [mermaid](https://mermaid.js.org) — 図表 (バンドル同梱)
+[MIT](LICENSE)。同梱しているライブラリのライセンスは [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にあります。

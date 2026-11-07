@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ja" data-appearance="light" data-writing="horizontal" data-theme="default">
+<head>
+<meta charset="utf-8">
+<!--
+  任意の md を開くアプリなので、本文に紛れた <script> や外部通信は CSP で止める。
+  スクリプトは同梱ファイルのみ。画像は外部とローカルを許可する。
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' shiori-file: https:; img-src 'self' shiori-file: https: http: data: blob:; media-src 'self' shiori-file: https: http:; font-src 'self' shiori-file: https: data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Shiori</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" id="theme-link" href="themes/default.css">
+<link rel="stylesheet" id="custom-link" disabled>
+<script src="viewer.js" defer></script>
+</head>
+<body>
+<div id="progress"></div>
+<main id="scroller"><article id="content" class="shiori-doc"></article></main>
+<div id="lightbox" hidden></div>
+</body>
+</html>
