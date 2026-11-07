@@ -39,7 +39,7 @@ PDF、HTML（画像を埋め込んだ 1 ファイル）、印刷。外部ツー�
 
 ## インストール
 
-[Releases](https://github.com/Geology-cat/Shiori/releases/latest) から DMG をダウンロードし、`Shiori.app` を Applications へドラッグしてください。動作環境は macOS 14 以降の Apple Silicon Mac です。
+[Releases](https://github.com/Geology-cat/Shiori/releases/latest) から DMG をダウンロードし、`Shiori.app` を Applications へドラッグしてください。動作環境は macOS 14 以降です（Intel と Apple Silicon の両方に対応）。
 
 Apple の公証を受けていないため、初回は macOS に止められます。次のどちらかで開けます。
 
@@ -80,7 +80,7 @@ Xcode 16 以降が必要です。ビューワーのビルド結果（`web/dist`�
 make run
 ```
 
-`make dmg` で配布用の DMG を作れます。作られるのはビルドした Mac のアーキテクチャ向けです。
+`make dmg` で配布用の DMG を作れます。
 
 ビューワーを変更するときは Node.js も必要です。
 

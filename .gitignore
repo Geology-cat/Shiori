@@ -15,3 +15,6 @@ node_modules/
 
 # Claude Code のローカル設定
 .claude/settings.local.json
+
+# カバレッジの出力
+*.profraw
