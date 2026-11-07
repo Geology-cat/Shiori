@@ -34,8 +34,6 @@ final class DocumentTab: ObservableObject, Identifiable {
     // 閲覧・編集の位置
     /// 閲覧と編集で共有する位置（整数部が行、小数部が行の中のどのあたりか）
     var viewerLine: Double = 0
-    /// このファイルだけの表示の調整
-    var overrides = ViewOverrides()
     var editorSelection = NSRange(location: 0, length: 0)
     var editorScroll: CGFloat?
     var pendingFragment: String?
@@ -74,9 +72,7 @@ final class DocumentTab: ObservableObject, Identifiable {
             apply(loaded)
         }
         undoManager.removeAllActions()
-        let saved = ReadingStore.shared.state(for: newURL)
-        viewerLine = saved.line
-        overrides = saved.overrides
+        viewerLine = ReadingStore.shared.state(for: newURL).line
         editorSelection = NSRange(location: 0, length: 0)
         editorScroll = nil
         isDirty = false

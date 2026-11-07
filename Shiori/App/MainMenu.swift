@@ -167,7 +167,7 @@ final class MainMenuBuilder: NSObject, NSMenuDelegate {
         panel.allowsMultipleSelection = true
         panel.message = "Markdown ファイルかフォルダを選んでください"
         guard panel.runModal() == .OK else { return }
-        delegate.open(panel.urls)
+        delegate.open(panel.urls, from: .app)
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -175,7 +175,7 @@ final class MainMenuBuilder: NSObject, NSMenuDelegate {
         if menu === recentFilesMenu {
             let files = RecentItems.files
             for url in files {
-                menu.addItem(action(url.lastPathComponent) { [weak self] in self?.delegate.open([url]) })
+                menu.addItem(action(url.lastPathComponent) { [weak self] in self?.delegate.open([url], from: .app) })
             }
             if files.isEmpty {
                 menu.addItem(withTitle: "なし", action: nil, keyEquivalent: "")
@@ -186,7 +186,7 @@ final class MainMenuBuilder: NSObject, NSMenuDelegate {
         } else if menu === recentFoldersMenu {
             let folders = RecentItems.folders
             for url in folders {
-                menu.addItem(action(url.lastPathComponent) { [weak self] in self?.delegate.open([url]) })
+                menu.addItem(action(url.lastPathComponent) { [weak self] in self?.delegate.open([url], from: .app) })
             }
             if folders.isEmpty { menu.addItem(withTitle: "なし", action: nil, keyEquivalent: "") }
         } else if menu === themeMenu {
@@ -336,7 +336,7 @@ final class MainMenuBuilder: NSObject, NSMenuDelegate {
         theme.submenu = themeSub
         themeMenu = themeSub
         menu.addItem(theme)
-        menu.addItem(action("このファイルの表示を既定に戻す", enabled: { [weak self] in self?.ws?.hasOverrides ?? false }) { [weak self] in
+        menu.addItem(action("このウインドウの表示を既定に戻す", enabled: { [weak self] in self?.ws?.hasOverrides ?? false }) { [weak self] in
             self?.ws?.resetOverrides()
         })
         menu.addItem(.separator())
@@ -407,6 +407,6 @@ final class MainMenuBuilder: NSObject, NSMenuDelegate {
             ws?.showError("ガイドを開けませんでした", detail: error.localizedDescription)
             return
         }
-        delegate.open([target])
+        delegate.open([target], from: .app)
     }
 }

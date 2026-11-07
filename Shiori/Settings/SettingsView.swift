@@ -48,6 +48,20 @@ private struct GeneralTab: View {
                 ForEach(AppearanceChoice.allCases) { Text($0.label).tag($0) }
             }
             Section {
+                Picker("ファイラーで選んだとき", selection: $settings.filerOpenMode) {
+                    ForEach(FilerOpenMode.allCases) { Text($0.label).tag($0) }
+                }
+                Picker("Finder などから開いたとき", selection: $settings.externalOpenMode) {
+                    ForEach(ExternalOpenMode.allCases) { Text($0.label).tag($0) }
+                }
+            } header: {
+                Text("ファイルの開き方")
+            } footer: {
+                Text("ファイラーでは ⌘ を押しながらクリックすると逆の開き方になります。Finder のダブルクリックやアイコンへのドロップで開くとき、同じウインドウなら今の表示設定のまま、新しいウインドウなら既定の表示で開きます。すでに開いているファイルはそのタブを前面に出します。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 Toggle("自動で保存する", isOn: $settings.autosave)
                 Toggle("起動時に前回の状態を復元する", isOn: $settings.restoreSession)
             }
@@ -83,11 +97,8 @@ private struct ViewerTab: View {
                 Picker("既定のテーマ", selection: $settings.themeID) {
                     ForEach(themes.allThemes) { Text($0.name).tag($0.id) }
                 }
-                Picker("既定の組方向", selection: $settings.writing) {
-                    ForEach(WritingMode.allCases) { Text($0.label).tag($0) }
-                }
             } footer: {
-                Text("文書を開いたときの表示です。表示パネル（Aa）で変えた設定はそのファイルだけに効きます。")
+                Text("起動したときや新しいウインドウを開いたときの表示です。表示パネル（Aa）で変えた設定はそのウインドウだけに効き、同じウインドウで開くファイルにも引き継がれます。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -96,7 +107,11 @@ private struct ViewerTab: View {
                 Picker("テーマ", selection: Binding(get: { themeID }, set: { editingThemeID = $0 })) {
                     ForEach(themes.allThemes) { Text($0.name).tag($0.id) }
                 }
-                StyleEditor(style: styleBinding, writing: settings.writing)
+                Picker("組方向", selection: styleBinding.writing) {
+                    ForEach(WritingMode.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                StyleEditor(style: styleBinding, writing: styleBinding.wrappedValue.writing)
                     .padding(.vertical, 4)
                 HStack {
                     Spacer()
@@ -106,7 +121,7 @@ private struct ViewerTab: View {
             } header: {
                 Text("テーマごとの既定")
             } footer: {
-                Text("テーマを選んだときの文字の大きさや組版です。設定はテーマごとに保存されます。")
+                Text("そのテーマで表示するときの組方向、文字の大きさ、組版です。設定はテーマごとに保存されます。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

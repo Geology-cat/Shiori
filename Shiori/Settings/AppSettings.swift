@@ -15,6 +15,20 @@ enum WritingMode: String, CaseIterable, Identifiable, Codable {
     var label: String { self == .horizontal ? "横書き" : "縦書き" }
 }
 
+/// ファイラーで別のファイルを選んだときの開き方
+enum FilerOpenMode: String, CaseIterable, Identifiable {
+    case replace, newTab
+    var id: String { rawValue }
+    var label: String { self == .replace ? "今のタブで開く（置き換える）" : "新しいタブで開く" }
+}
+
+/// Finder や Dock のアイコンから開いたときの開き方
+enum ExternalOpenMode: String, CaseIterable, Identifiable {
+    case existingWindow, newWindow
+    var id: String { rawValue }
+    var label: String { self == .existingWindow ? "開いているウインドウのタブで開く" : "新しいウインドウで開く" }
+}
+
 /// 外観
 enum AppearanceChoice: String, CaseIterable, Identifiable {
     case system, light, dark
@@ -54,10 +68,11 @@ final class AppSettings: ObservableObject {
     @Published var autosave: Bool { didSet { defaults.set(autosave, forKey: Keys.autosave) } }
     @Published var restoreSession: Bool { didSet { defaults.set(restoreSession, forKey: Keys.restoreSession) } }
     @Published var showHiddenFiles: Bool { didSet { defaults.set(showHiddenFiles, forKey: Keys.showHiddenFiles) } }
+    @Published var filerOpenMode: FilerOpenMode { didSet { defaults.set(filerOpenMode.rawValue, forKey: Keys.filerOpenMode) } }
+    @Published var externalOpenMode: ExternalOpenMode { didSet { defaults.set(externalOpenMode.rawValue, forKey: Keys.externalOpenMode) } }
 
     // ビューワー
     @Published var themeID: String { didSet { defaults.set(themeID, forKey: Keys.themeID) } }
-    @Published var writing: WritingMode { didSet { defaults.set(writing.rawValue, forKey: Keys.writing) } }
     /// テーマごとの既定の詳細設定。キーはテーマの ID
     @Published var themeStyles: [String: ViewStyle] {
         didSet {
@@ -81,7 +96,8 @@ final class AppSettings: ObservableObject {
         static let restoreSession = "restoreSession"
         static let showHiddenFiles = "showHiddenFiles"
         static let themeID = "themeID"
-        static let writing = "writing"
+        static let filerOpenMode = "filerOpenMode"
+        static let externalOpenMode = "externalOpenMode"
         static let themeStyles = "themeStyles"
         static let breaks = "breaks"
         static let showProperties = "showProperties"
@@ -108,7 +124,8 @@ final class AppSettings: ObservableObject {
         restoreSession = d.bool(forKey: Keys.restoreSession)
         showHiddenFiles = d.bool(forKey: Keys.showHiddenFiles)
         themeID = d.string(forKey: Keys.themeID) ?? "default"
-        writing = WritingMode(rawValue: d.string(forKey: Keys.writing) ?? "") ?? .horizontal
+        filerOpenMode = FilerOpenMode(rawValue: d.string(forKey: Keys.filerOpenMode) ?? "") ?? .replace
+        externalOpenMode = ExternalOpenMode(rawValue: d.string(forKey: Keys.externalOpenMode) ?? "") ?? .existingWindow
         themeStyles = d.data(forKey: Keys.themeStyles).flatMap { try? JSONDecoder().decode([String: ViewStyle].self, from: $0) } ?? [:]
         breaks = d.bool(forKey: Keys.breaks)
         showProperties = d.bool(forKey: Keys.showProperties)

@@ -109,39 +109,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Finder などから開く
 
-    /// 開いている窓のどこで開くかを決める。
-    /// ファイルを含むルートの窓があればそこのタブで、なければ親フォルダをルートにした窓で開く。
-    func open(_ urls: [URL]) {
+    /// どこから開こうとしているか
+    enum OpenSource {
+        /// Finder のダブルクリック、Dock のアイコンへのドロップなど
+        case external
+        /// アプリ内の「開く…」や最近使った項目
+        case app
+    }
+
+    /// ファイルやフォルダを開くウインドウを決める。
+    /// - すでにどこかのタブで開いていれば、そのタブを前面に出す
+    /// - 外から開くときは環境設定に従い、今のウインドウのタブか新しいウインドウで開く
+    ///   （同じウインドウなら今の表示設定を引き継ぎ、新しいウインドウは既定の表示で始まる）
+    /// - アプリ内から開くときは今のウインドウで開く
+    func open(_ urls: [URL], from source: OpenSource = .external) {
+        let useCurrentWindow = source == .app || AppSettings.shared.externalOpenMode == .existingWindow
+        // 1 回の操作で複数のファイルを開くときは、新しいウインドウを 1 枚にまとめる
+        var windowForThisRequest: MainWindowController?
+
         for url in urls {
             let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-            if let controller = bestWindow(for: url, isDirectory: isDirectory) {
-                controller.window?.makeKeyAndOrderFront(nil)
-                currentController = controller
-                controller.workspace.open(url, newTab: true)
-            } else if isDirectory {
-                _ = makeWindow(root: url)
+
+            if !isDirectory, let (controller, tab) = windowShowing(url) {
+                bringToFront(controller)
+                controller.workspace.activate(tab)
+                continue
+            }
+
+            if isDirectory {
+                if source == .app, let current = currentWindow {
+                    bringToFront(current)
+                    current.workspace.setRoot(url)
+                    current.workspace.sidebarVisible = true
+                } else if let empty = emptyWindow {
+                    bringToFront(empty)
+                    empty.workspace.setRoot(url)
+                } else {
+                    _ = makeWindow(root: url)
+                }
+                continue
+            }
+
+            let target = useCurrentWindow ? currentWindow : (windowForThisRequest ?? emptyWindow)
+            if let target {
+                bringToFront(target)
+                target.workspace.open(url, newTab: true)
+                if !useCurrentWindow { windowForThisRequest = target }
             } else {
                 let controller = makeWindow(root: url.deletingLastPathComponent())
                 controller.workspace.open(url, newTab: true)
+                windowForThisRequest = controller
             }
         }
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func bestWindow(for url: URL, isDirectory: Bool) -> MainWindowController? {
-        let path = url.standardizedFileURL.path
-        // ファイルを含むルートのうち、いちばん深いものを選ぶ
-        var best: (MainWindowController, Int)?
-        if !isDirectory {
-            for controller in windowControllers {
-                guard let root = controller.workspace.rootURL?.path else { continue }
-                let prefix = root.hasSuffix("/") ? root : root + "/"
-                if path.hasPrefix(prefix), root.count > (best?.1 ?? -1) { best = (controller, root.count) }
+    /// 最後に操作していたウインドウ
+    private var currentWindow: MainWindowController? {
+        currentController ?? windowControllers.last
+    }
+
+    /// 何も開いていないウインドウ（再利用できる）
+    private var emptyWindow: MainWindowController? {
+        windowControllers.first { $0.workspace.rootURL == nil && $0.workspace.tabs.isEmpty }
+    }
+
+    /// そのファイルを開いているウインドウとタブ
+    private func windowShowing(_ url: URL) -> (MainWindowController, DocumentTab)? {
+        let target = url.standardizedFileURL
+        for controller in windowControllers {
+            if let tab = controller.workspace.tabs.first(where: { $0.url?.standardizedFileURL == target }) {
+                return (controller, tab)
             }
         }
-        if let best { return best.0 }
-        // 何も開いていない窓があれば再利用する
-        return windowControllers.first { $0.workspace.rootURL == nil && $0.workspace.tabs.isEmpty }
+        return nil
+    }
+
+    private func bringToFront(_ controller: MainWindowController) {
+        controller.window?.makeKeyAndOrderFront(nil)
+        currentController = controller
     }
 
     // MARK: - 環境設定

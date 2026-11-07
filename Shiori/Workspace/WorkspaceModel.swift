@@ -172,6 +172,12 @@ final class WorkspaceModel: ObservableObject {
         presentActive()
     }
 
+    /// ファイラーやクイックオープンから開く。開き方は環境設定に従い、alternate（⌘ を押しながら）なら逆にする
+    func openFromFiler(_ url: URL, alternate: Bool = false) {
+        let newTab = (AppSettings.shared.filerOpenMode == .newTab) != alternate
+        open(url, newTab: newTab)
+    }
+
     /// 新しい空のタブを作る
     func newUntitledTab() {
         add(DocumentTab(mode: .edit))
@@ -548,39 +554,39 @@ final class WorkspaceModel: ObservableObject {
         pushViewerSettings()
     }
 
-    /// 指定タブに効いているテーマ（ファイルごとの調整 → 環境設定の既定 の順に見る）
-    func effectiveThemeID(for tab: DocumentTab?) -> String {
-        tab?.overrides.themeID ?? AppSettings.shared.themeID
+    /// このウインドウの表示の調整。同じウインドウで開くファイルには引き継ぐ
+    @Published private(set) var viewOverrides = ViewOverrides()
+
+    /// 効いているテーマ（ウインドウの調整 → 環境設定の既定 の順に見る）。
+    /// 表示設定はウインドウ単位なので tab は使わないが、呼び出し側の意図が分かるよう引数に残す
+    func effectiveThemeID(for tab: DocumentTab? = nil) -> String {
+        viewOverrides.themeID ?? AppSettings.shared.themeID
     }
 
-    func effectiveWriting(for tab: DocumentTab?) -> WritingMode {
-        tab?.overrides.writing ?? AppSettings.shared.writing
+    /// テーマの既定（組方向を含む）にウインドウの調整を重ねた表示設定
+    func effectiveStyle(for tab: DocumentTab? = nil) -> ViewStyle {
+        viewOverrides.applied(to: AppSettings.shared.style(for: effectiveThemeID()))
     }
 
-    /// テーマの既定にファイルごとの調整を重ねた詳細設定
-    func effectiveStyle(for tab: DocumentTab?) -> ViewStyle {
-        let base = AppSettings.shared.style(for: effectiveThemeID(for: tab))
-        return tab?.overrides.applied(to: base) ?? base
+    func effectiveWriting(for tab: DocumentTab? = nil) -> WritingMode {
+        effectiveStyle().writing
     }
 
-    /// 表示パネルで変えた設定は、そのファイルだけに効く。既定は環境設定でしか変えない
+    /// 表示パネルやメニューで変えた設定は、このウインドウだけに効く。既定は環境設定でしか変えない
     func updateOverrides(_ change: (inout ViewOverrides) -> Void) {
-        guard let tab = activeTab else { return }
-        change(&tab.overrides)
-        if let url = tab.url {
-            let overrides = tab.overrides
-            ReadingStore.shared.update(url) { $0.overrides = overrides }
-        }
-        objectWillChange.send()
+        var next = viewOverrides
+        change(&next)
+        guard next != viewOverrides else { return }
+        viewOverrides = next
         pushViewerSettings()
     }
 
-    /// このファイルの調整をやめて既定の表示に戻す
+    /// このウインドウの調整をやめて既定の表示に戻す
     func resetOverrides() {
         updateOverrides { $0 = ViewOverrides() }
     }
 
-    var hasOverrides: Bool { !(activeTab?.overrides.isEmpty ?? true) }
+    var hasOverrides: Bool { !viewOverrides.isEmpty }
 
     func setTheme(_ id: String) {
         updateOverrides { $0.themeID = id }

@@ -98,7 +98,7 @@ struct QuickOpenOverlay: View {
         guard list.indices.contains(selection) else { return }
         let url = list[selection]
         close()
-        workspace.open(url, newTab: NSEvent.modifierFlags.contains(.command))
+        workspace.openFromFiler(url, alternate: NSEvent.modifierFlags.contains(.command))
     }
 
     private func close() {

@@ -22,14 +22,29 @@ final class ViewStyleTests: XCTestCase {
         XCTAssertFalse(overrides.isEmpty)
     }
 
-    func test保存して読み戻せる() throws {
+    func test組方向もテーマの既定と調整で決まる() {
+        let vertical = ViewStyle(writing: .vertical)
+        XCTAssertEqual(ViewOverrides().applied(to: vertical).writing, .vertical)
         var overrides = ViewOverrides()
-        overrides.themeID = "reading"
-        overrides.writing = .vertical
-        let data = try JSONEncoder().encode(FileViewState(line: 12.5, overrides: overrides))
-        let decoded = try JSONDecoder().decode(FileViewState.self, from: data)
-        XCTAssertEqual(decoded.line, 12.5)
-        XCTAssertEqual(decoded.overrides, overrides)
+        overrides.writing = .horizontal
+        XCTAssertEqual(overrides.applied(to: vertical).writing, .horizontal)
+    }
+
+    func test組方向がない古い保存データも読める() throws {
+        let old = #"{"fontScale":1.3,"lineHeight":0,"measure":0,"fontChoice":"mincho","customFontName":"","indent":true,"justify":false,"headingNumbers":false}"#
+        let style = try JSONDecoder().decode(ViewStyle.self, from: Data(old.utf8))
+        XCTAssertEqual(style.writing, .horizontal)
+        XCTAssertEqual(style.fontScale, 1.3)
+        XCTAssertEqual(style.fontChoice, .mincho)
+        XCTAssertTrue(style.indent)
+    }
+
+    func test読書位置を保存して読み戻せる() throws {
+        let data = try JSONEncoder().encode(FileViewState(line: 12.5))
+        XCTAssertEqual(try JSONDecoder().decode(FileViewState.self, from: data).line, 12.5)
+        // 以前の形式（表示の調整を含む）も読める
+        let old = #"{"line":3.5,"updatedAt":815738221,"overrides":{"writing":"vertical"}}"#
+        XCTAssertEqual(try JSONDecoder().decode(FileViewState.self, from: Data(old.utf8)).line, 3.5)
     }
 
     func test文字の倍率は範囲内に収まる() {

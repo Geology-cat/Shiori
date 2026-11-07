@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 上部バーの「Aa」から開く表示パネル。ここでの変更はこのファイルだけに効き、既定は変えない。
+/// 上部バーの「Aa」から開く表示パネル。ここでの変更はこのウインドウだけに効き、既定は変えない。
 struct ReadingOptionsView: View {
     @ObservedObject var workspace: WorkspaceModel
     @ObservedObject var settings: AppSettings
@@ -10,7 +10,7 @@ struct ReadingOptionsView: View {
     private var currentTheme: String { workspace.effectiveThemeID(for: tab) }
     private var currentWriting: WritingMode { workspace.effectiveWriting(for: tab) }
 
-    /// 詳細設定を編集すると、既定と違う項目だけがこのファイルの調整として残る
+    /// 詳細設定を編集すると、変えた項目だけがこのウインドウの調整として残る
     private var styleBinding: Binding<ViewStyle> {
         Binding(
             get: { workspace.effectiveStyle(for: tab) },
@@ -56,9 +56,9 @@ struct ReadingOptionsView: View {
 
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(workspace.hasOverrides ? "このファイル用に調整しています" : "既定の表示です")
+                    Text(workspace.hasOverrides ? "このウインドウ用に調整しています" : "既定の表示です")
                         .font(.system(size: 11.5, weight: .medium))
-                    Text("既定は環境設定で変更できます")
+                    Text("同じウインドウで開くファイルにも引き継ぎます")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
                 }

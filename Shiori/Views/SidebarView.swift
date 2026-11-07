@@ -185,8 +185,8 @@ private struct FileRowView: View {
         )
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
-        .gesture(TapGesture().modifiers(.command).onEnded { open(newTab: true) })
-        .onTapGesture { open(newTab: false) }
+        .gesture(TapGesture().modifiers(.command).onEnded { open(alternate: true) })
+        .onTapGesture { open(alternate: false) }
         .help(row.name)
         .contextMenu { menu }
         .onDrag { NSItemProvider(object: row.url as NSURL) }
@@ -212,13 +212,14 @@ private struct FileRowView: View {
         FileKinds.isMarkdown(row.url) ? row.url.deletingPathExtension().lastPathComponent : row.name
     }
 
-    private func open(newTab: Bool) {
+    private func open(alternate: Bool) {
         if row.isDirectory {
             tree.toggle(row)
         } else {
-            workspace.open(row.url, newTab: newTab)
+            workspace.openFromFiler(row.url, alternate: alternate)
         }
     }
+
 
     @ViewBuilder
     private var menu: some View {
@@ -227,6 +228,7 @@ private struct FileRowView: View {
             Divider()
             Button("このフォルダをルートにする") { workspace.setRoot(row.url) }
         } else {
+            Button("今のタブで開く") { workspace.open(row.url, newTab: false) }
             Button("新しいタブで開く") { workspace.open(row.url, newTab: true) }
             Button("新規ファイル…") { workspace.createFile(in: row.url.deletingLastPathComponent()) }
         }
@@ -313,7 +315,7 @@ private struct FilterResultRow: View {
         .background(RoundedRectangle(cornerRadius: 5).fill(isHovering ? Color.primary.opacity(0.05) : .clear))
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
-        .onTapGesture { workspace.open(url) }
+        .onTapGesture { workspace.openFromFiler(url, alternate: NSEvent.modifierFlags.contains(.command)) }
     }
 
     private var relativeDirectory: String {
