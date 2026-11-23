@@ -676,6 +676,68 @@ details:not(.callout):not(.properties) > summary { cursor: pointer; }
 :root[data-writing="vertical"] .image-mode { writing-mode: horizontal-tb; }
 
 /* ------------------------------------------------------------
+   ページめくり（読書テーマ）
+   本文を段組みでページに割り、paged.js が transform で 1 ページずつ送る。
+   寸法は paged.js が本文の要素に変数で渡す。テーマの指定に勝つよう #content で書く。
+   ------------------------------------------------------------ */
+
+#pager { display: none; }
+
+:root[data-paged="on"] #scroller { overflow: hidden; }
+
+:root[data-paged="on"] #content:not(.image-mode):not(:empty) {
+  inline-size: var(--page-inline, 100%);
+  block-size: var(--page-block, 100%);
+  min-block-size: 0;
+  max-inline-size: none;
+  margin: 0;
+  margin-inline: auto;
+  padding-block: var(--page-pad-start, 2.5em) var(--page-pad-end, 3em);
+  padding-inline: var(--page-margin, 2em);
+  column-count: var(--page-columns, 1);
+  column-gap: calc(var(--page-margin, 2em) * 2);
+  column-fill: auto;
+  overflow: visible;
+  will-change: transform;
+}
+
+/* 段の途中で切りたくないもの */
+:root[data-paged="on"] #content :is(figure, img, .math-block, .diagram, .callout-title, tr, .properties) { break-inside: avoid; }
+:root[data-paged="on"] #content :is(h1, h2, h3, h4, h5, h6) { break-after: avoid; break-inside: avoid; }
+
+/* 段より大きいものは段に収める */
+:root[data-paged="on"] #content img { max-width: var(--col-w); max-height: var(--col-h); object-fit: contain; }
+:root[data-paged="on"] #content figure img { max-height: calc(var(--col-h) - 3em); }
+:root[data-paged="on"] #content :is(.code-block pre, .table-wrap, .math-block, .diagram) { max-height: var(--col-h); overflow: auto; }
+:root[data-paged="on"] #content .diagram svg { max-height: var(--col-h); }
+
+/* 縦書きの島（横組みのまま置く要素）は、段の大きさに合わせる */
+:root[data-paged="on"][data-writing="vertical"] #content :is(.code-block, .table-wrap, .math-block, .diagram, .properties, .toc, figure) {
+  max-width: var(--col-w);
+  max-height: var(--col-h);
+  margin: 0 1em;
+}
+:root[data-paged="on"][data-writing="vertical"] #content figure img { max-width: var(--col-w); max-height: calc(var(--col-h) - 3em); }
+:root[data-paged="on"][data-writing="vertical"] #content .code-block pre { max-height: var(--col-h); padding-inline-end: 1em; }
+
+/* ノンブル（ページ番号） */
+:root[data-paged="on"] #pager:not([hidden]) {
+  display: block;
+  position: fixed;
+  z-index: 5;
+  inset-inline: 0;
+  inset-block-end: 0.7rem;
+  writing-mode: horizontal-tb;
+  text-align: center;
+  font: 11px/1 -apple-system, "Hiragino Sans", sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+  color: var(--faint);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ------------------------------------------------------------
    印刷・PDF
    ------------------------------------------------------------ */
 
@@ -692,7 +754,9 @@ details:not(.callout):not(.properties) > summary { cursor: pointer; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { overflow: visible; block-size: auto; background: #fff; }
   #scroller { position: static; overflow: visible; }
-  #progress, #lightbox, .copy-btn { display: none !important; }
+  #progress, #pager, #lightbox, .copy-btn { display: none !important; }
+  /* 印刷は紙の改ページに任せる（ページめくりの段組みは使わない） */
+  :root[data-paged="on"] #content { columns: auto; inline-size: auto; block-size: auto; transform: none !important; }
   .shiori-doc { inline-size: auto; max-inline-size: none; padding: 0; }
   .code-block, table, figure, .math-block, .diagram, .callout, blockquote { break-inside: avoid; }
   .code-block pre { white-space: pre-wrap; overflow: visible; }

@@ -25,6 +25,7 @@ struct ReadingOptionsView: View {
                     if newValue.indent != old.indent { o.indent = newValue.indent }
                     if newValue.justify != old.justify { o.justify = newValue.justify }
                     if newValue.headingNumbers != old.headingNumbers { o.headingNumbers = newValue.headingNumbers }
+                    if newValue.columns != old.columns { o.columns = newValue.columns }
                 }
             }
         )
@@ -50,7 +51,7 @@ struct ReadingOptionsView: View {
                 .labelsHidden()
             }
 
-            StyleEditor(style: styleBinding, writing: currentWriting)
+            StyleEditor(style: styleBinding, writing: currentWriting, paged: themes.theme(id: currentTheme).paged)
 
             Divider()
 
@@ -82,9 +83,21 @@ struct ReadingOptionsView: View {
 struct StyleEditor: View {
     @Binding var style: ViewStyle
     let writing: WritingMode
+    /// ページめくりのテーマなら段組みを選べる
+    var paged = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if paged {
+                OptionSection(title: "段組み") {
+                    Picker("", selection: $style.columns) {
+                        Text("1 段").tag(1)
+                        Text("2 段").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+            }
             OptionSection(title: "文字") {
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {

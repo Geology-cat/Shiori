@@ -55,31 +55,70 @@ final class FileTreeModel: ObservableObject {
         }
     }
 
-    /// フォルダの中身をフィルタして並べる（フォルダが先、名前は自然順）
+    /// 並べ替えに使う 1 項目ぶんの情報
+    struct Entry {
+        let url: URL
+        let isDirectory: Bool
+        let modified: Date?
+        let created: Date?
+    }
+
+    /// フォルダの中身をフィルタして、環境設定の並び順（既定はフォルダが先、名前の自然順）で並べる
     static func children(of directory: URL) -> [(URL, Bool)] {
+        let settings = AppSettings.shared
         var options: FileManager.DirectoryEnumerationOptions = []
-        if !AppSettings.shared.showHiddenFiles { options.insert(.skipsHiddenFiles) }
+        if !settings.showHiddenFiles { options.insert(.skipsHiddenFiles) }
+        // 日付は一覧を取るたびに読み直す（resourceValues はキャッシュするので古い値を掴まないように）
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isPackageKey, .contentModificationDateKey, .creationDateKey]
         let items = (try? FileManager.default.contentsOfDirectory(
             at: directory,
-            includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey],
+            includingPropertiesForKeys: keys,
             options: options
         )) ?? []
 
-        var list: [(URL, Bool)] = []
+        var list: [Entry] = []
         for url in items {
-            let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
+            let values = try? url.resourceValues(forKeys: Set(keys))
             let isDir = values?.isDirectory ?? false
             if isDir {
                 if values?.isPackage == true { continue } // .app などのパッケージは出さない
                 if skipNames.contains(url.lastPathComponent) { continue }
-                list.append((url, true))
-            } else if FileKinds.isShownInFiler(url) {
-                list.append((url, false))
+            } else if !FileKinds.isShownInFiler(url) {
+                continue
+            }
+            list.append(Entry(url: url, isDirectory: isDir, modified: values?.contentModificationDate, created: values?.creationDate))
+        }
+        return sorted(list, by: settings.filerSortKey, ascending: settings.filerSortAscending, foldersFirst: settings.filerFoldersFirst)
+            .map { ($0.url, $0.isDirectory) }
+    }
+
+    /// 並べ替え。同じ値どうしは名前の自然順にする
+    static func sorted(_ entries: [Entry], by key: FilerSortKey, ascending: Bool, foldersFirst: Bool) -> [Entry] {
+        func byName(_ a: Entry, _ b: Entry) -> ComparisonResult {
+            a.url.lastPathComponent.localizedStandardCompare(b.url.lastPathComponent)
+        }
+        func compare(_ a: Entry, _ b: Entry) -> ComparisonResult {
+            switch key {
+            case .name:
+                return byName(a, b)
+            case .modified, .created:
+                let da = (key == .modified ? a.modified : a.created) ?? .distantPast
+                let db = (key == .modified ? b.modified : b.created) ?? .distantPast
+                if da != db { return da < db ? .orderedAscending : .orderedDescending }
+                return byName(a, b)
+            case .kind:
+                // フォルダは拡張子がないので先頭にまとまる
+                let ka = a.isDirectory ? "" : a.url.pathExtension.lowercased()
+                let kb = b.isDirectory ? "" : b.url.pathExtension.lowercased()
+                if ka != kb { return ka.localizedStandardCompare(kb) }
+                return byName(a, b)
             }
         }
-        return list.sorted { a, b in
-            if a.1 != b.1 { return a.1 }
-            return a.0.lastPathComponent.localizedStandardCompare(b.0.lastPathComponent) == .orderedAscending
+        return entries.sorted { a, b in
+            if foldersFirst, a.isDirectory != b.isDirectory { return a.isDirectory }
+            let result = compare(a, b)
+            if result == .orderedSame { return false }
+            return (result == .orderedAscending) == ascending
         }
     }
 

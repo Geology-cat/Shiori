@@ -111,7 +111,7 @@ private struct ViewerTab: View {
                     ForEach(WritingMode.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                StyleEditor(style: styleBinding, writing: styleBinding.wrappedValue.writing)
+                StyleEditor(style: styleBinding, writing: styleBinding.wrappedValue.writing, paged: themes.theme(id: themeID).paged)
                     .padding(.vertical, 4)
                 HStack {
                     Spacer()

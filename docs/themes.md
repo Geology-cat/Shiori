@@ -90,5 +90,8 @@
 | `data-writing` | `horizontal` / `vertical` |
 | `data-lang` | `ja` / `en`（本文から自動判定） |
 | `data-heading-numbers` `data-indent` `data-justify` | `on` / `off` |
+| `data-paged` | `on` / `off`（読書モード〈ページめくり〉で表示しているとき） |
+
+ページめくりの割り付け（段組みの寸法、ページの送り）はアプリが `#content` に指定するので、テーマで本文の幅や余白を変えてもページの大きさは変わりません。自前のテーマはスクロールで表示されます。
 
 同梱テーマのソース（`web/themes/`）も参考になります。

@@ -38,6 +38,7 @@ struct SidebarView: View {
         }
         .padding(.horizontal, 8)
         .frame(height: 32)
+        .background(TitlebarArea())
     }
 }
 
@@ -360,12 +361,67 @@ private struct RootBar: View {
             .menuStyle(.borderlessButton)
             .help(workspace.rootURL?.path ?? "")
             Spacer(minLength: 0)
+            SortMenu(settings: AppSettings.shared)
             if let root = workspace.rootURL {
                 IconButton(systemName: "plus", help: "新規ファイル") { workspace.createFile(in: root) }
             }
         }
         .padding(.horizontal, 6)
         .frame(height: 30)
+    }
+}
+
+/// ファイラーの並び順を選ぶメニュー（すべてのウインドウに効く）
+private struct SortMenu: View {
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        Menu {
+            Picker("並び順", selection: Binding(
+                get: { settings.filerSortKey },
+                set: { key in
+                    guard key != settings.filerSortKey else { return }
+                    settings.filerSortKey = key
+                    settings.filerSortAscending = key.defaultAscending
+                }
+            )) {
+                ForEach(FilerSortKey.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+            Divider()
+            Picker("向き", selection: $settings.filerSortAscending) {
+                Text(ascendingLabel).tag(true)
+                Text(descendingLabel).tag(false)
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+            Divider()
+            Toggle("フォルダを先に表示", isOn: $settings.filerFoldersFirst)
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .frame(width: 26, height: 24)
+        .help("並び順: \(settings.filerSortKey.label)")
+    }
+
+    private var ascendingLabel: String {
+        switch settings.filerSortKey {
+        case .name, .kind: return "昇順（A → Z）"
+        case .modified, .created: return "古い順"
+        }
+    }
+
+    private var descendingLabel: String {
+        switch settings.filerSortKey {
+        case .name, .kind: return "降順（Z → A）"
+        case .modified, .created: return "新しい順"
+        }
     }
 }
 

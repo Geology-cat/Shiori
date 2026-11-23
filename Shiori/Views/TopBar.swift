@@ -22,6 +22,7 @@ struct TopBar: View {
         .padding(.leading, leadingInset)
         .padding(.trailing, 10)
         .frame(height: 32)
+        .background(TitlebarArea())
         .background(Color(nsColor: .windowBackgroundColor))
     }
 }
@@ -87,44 +88,141 @@ private struct ModeSwitch: View {
 
 private struct TabStrip: View {
     @ObservedObject var workspace: WorkspaceModel
-    @State private var draggingID: UUID?
+    @State private var drag: TabDrag?
+    /// 各タブの位置（タブ欄の座標）。並べ替えの判定に使う
+    @State private var frames: [UUID: CGRect] = [:]
+
+    private static let spacing: CGFloat = 2
+    /// タブ欄から縦にこれだけ離すと、タブを切り離す
+    private static let detachDistance: CGFloat = 36
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 2) {
-                ForEach(workspace.tabs) { tab in
-                    TabItem(workspace: workspace, tab: tab, isActive: tab.id == workspace.activeTabID)
-                        .onDrag {
-                            draggingID = tab.id
-                            return NSItemProvider(object: tab.id.uuidString as NSString)
-                        }
-                        .onDrop(of: [.text], delegate: TabDropDelegate(workspace: workspace, target: tab, draggingID: $draggingID))
+        GeometryReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Self.spacing) {
+                    ForEach(workspace.tabs) { tab in
+                        let isDragging = drag?.id == tab.id
+                        TabItem(workspace: workspace, tab: tab, isActive: tab.id == workspace.activeTabID)
+                            .background(GeometryReader { g in
+                                Color.clear
+                                    .preference(key: TabFramesKey.self, value: [tab.id: g.frame(in: .named(Self.space))])
+                                    .preference(key: TabWindowFramesKey.self, value: [tab.id: g.frame(in: .global)])
+                            })
+                            .offset(x: isDragging ? (drag?.offset ?? 0) : 0)
+                            .opacity(isDragging && drag?.detached == true ? 0.35 : 1)
+                            .zIndex(isDragging ? 1 : 0)
+                            .gesture(dragGesture(for: tab))
+                    }
+                    IconButton(systemName: "plus", help: "新規タブ (⌘N)") { workspace.newUntitledTab() }
                 }
-                IconButton(systemName: "plus", help: "新規タブ (⌘N)") { workspace.newUntitledTab() }
+                .padding(.vertical, 2)
+                // 右側の空いた所もタイトルバーとして扱う（ドラッグで移動、ダブルクリックで拡大）
+                .frame(minWidth: proxy.size.width, minHeight: proxy.size.height, alignment: .leading)
+                .background(TitlebarArea())
+                .coordinateSpace(name: Self.space)
             }
-            .padding(.vertical, 2)
+            .onPreferenceChange(TabFramesKey.self) { value in
+                frames = value
+                drag?.awaitingLayout = false
+            }
+            .onPreferenceChange(TabWindowFramesKey.self) { value in
+                // 別のウインドウからタブを落とされたとき、どこへ差し込むかに使う
+                workspace.tabFramesInWindow = value
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private static let space = "tabstrip"
+
+    private func dragGesture(for tab: DocumentTab) -> some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.space))
+            .onChanged { value in
+                if drag?.id != tab.id {
+                    drag = TabDrag(id: tab.id)
+                    workspace.activate(tab)
+                }
+                guard var current = drag else { return }
+                let detached = abs(value.translation.height) > Self.detachDistance
+                current.detached = detached
+                if detached {
+                    // タブ欄の外: カーソルに札を付ける。別のウインドウのタブ欄の上ならそのウインドウへ、
+                    // それ以外（このウインドウの中を含む）なら新しいウインドウにする
+                    let point = NSEvent.mouseLocation
+                    let source = workspace.windowController
+                    if let target = AppDelegate.shared.tabBarTarget(at: point), target !== source {
+                        TabDragGhost.shared.show(title: tab.title, mode: .join, at: point)
+                    } else if workspace.tabs.count > 1 {
+                        TabDragGhost.shared.show(title: tab.title, mode: .newWindow, at: point)
+                    } else {
+                        // タブが 1 つだけなら新しいウインドウにはしない（別のウインドウへ移すことだけできる）
+                        TabDragGhost.shared.hide()
+                    }
+                } else {
+                    TabDragGhost.shared.hide()
+                    current.offset = value.translation.width - current.shift
+                    reorder(&current)
+                }
+                drag = current
+            }
+            .onEnded { _ in
+                let wasDetached = drag?.detached == true
+                TabDragGhost.shared.hide()
+                withAnimation(.easeOut(duration: 0.15)) { drag = nil }
+                if wasDetached, let controller = workspace.windowController {
+                    AppDelegate.shared.moveTab(tab, from: controller, to: NSEvent.mouseLocation)
+                } else {
+                    workspace.tabsReordered()
+                }
+            }
+    }
+
+    /// 引いているタブが隣のタブの中ほどを越えたら入れ替える
+    private func reorder(_ current: inout TabDrag) {
+        guard !current.awaitingLayout,
+              let index = workspace.tabs.firstIndex(where: { $0.id == current.id }),
+              let frame = frames[current.id] else { return }
+        let center = frame.midX + current.offset
+        if current.offset > 0, index + 1 < workspace.tabs.count,
+           let next = frames[workspace.tabs[index + 1].id], center > next.midX {
+            workspace.moveTab(from: index, to: index + 2)
+            current.shift += next.width + Self.spacing
+            current.offset -= next.width + Self.spacing
+            current.awaitingLayout = true
+        } else if current.offset < 0, index > 0,
+                  let previous = frames[workspace.tabs[index - 1].id], center < previous.midX {
+            workspace.moveTab(from: index, to: index - 1)
+            current.shift -= previous.width + Self.spacing
+            current.offset += previous.width + Self.spacing
+            current.awaitingLayout = true
+        }
     }
 }
 
-private struct TabDropDelegate: DropDelegate {
-    let workspace: WorkspaceModel
-    let target: DocumentTab
-    @Binding var draggingID: UUID?
+/// ドラッグ中のタブ
+private struct TabDrag {
+    let id: UUID
+    /// 元の位置からのずれ（タブ欄の中で動かしているとき）
+    var offset: CGFloat = 0
+    /// 入れ替えでタブ自体が動いたぶん。カーソルの下にタブを留めておくために差し引く
+    var shift: CGFloat = 0
+    /// タブ欄の外へ引き出している
+    var detached = false
+    /// 入れ替えた直後で、まだ新しい位置が測られていない
+    var awaitingLayout = false
+}
 
-    func dropEntered(info: DropInfo) {
-        guard let draggingID, draggingID != target.id,
-              let from = workspace.tabs.firstIndex(where: { $0.id == draggingID }),
-              let to = workspace.tabs.firstIndex(where: { $0.id == target.id }) else { return }
-        workspace.moveTab(from: from, to: to > from ? to + 1 : to)
+/// ウインドウの座標でのタブの位置
+private struct TabWindowFramesKey: PreferenceKey {
+    static var defaultValue: [UUID: CGRect] = [:]
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue()) { $1 }
     }
+}
 
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
-
-    func performDrop(info: DropInfo) -> Bool {
-        draggingID = nil
-        return true
+private struct TabFramesKey: PreferenceKey {
+    static var defaultValue: [UUID: CGRect] = [:]
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue()) { $1 }
     }
 }
 

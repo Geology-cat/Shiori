@@ -57,14 +57,19 @@ async function render({ markdown, path = null, position = null, keepPosition = f
 
   const target = position ?? previousPosition;
   scroll.resetInteraction();
+  scroll.relayout();
   scroll.scrollToPosition(target);
 
   // 画像の読込でレイアウトが動くので、ユーザーが触っていなければ位置を合わせ直す
   const images = Array.from(content.querySelectorAll('img')).filter((img) => !img.complete);
   if (images.length) {
     await Promise.allSettled(images.map((img) => img.decode()));
-    if (token === state.token && target != null && target > 0 && !scroll.hasInteracted()) {
-      scroll.scrollToPosition(target);
+    if (token === state.token) {
+      // ページめくりでは画像の大きさでページ数が変わるので割り付け直す
+      const now = scroll.isPaged() && scroll.hasInteracted() ? scroll.topPosition() : null;
+      scroll.relayout();
+      if (now != null) scroll.scrollToPosition(now);
+      else if (target != null && target > 0 && !scroll.hasInteracted()) scroll.scrollToPosition(target);
     }
   }
   scroll.notify();
@@ -90,6 +95,7 @@ function showImage({ path }) {
   img.addEventListener('click', () => wrap.classList.toggle('actual-size'));
   content.className = 'shiori-doc image-mode';
   content.replaceChildren(wrap);
+  scroll.relayout();
   scroll.scrollToStart();
 }
 
@@ -108,6 +114,7 @@ function clear() {
   state.path = null;
   content.className = 'shiori-doc';
   content.replaceChildren();
+  scroll.relayout();
   find.clear();
 }
 
@@ -160,6 +167,7 @@ async function applySettings(s) {
   setCssVar('--user-font', s.fontFamily || null);
   setCssVar('--user-code-font', s.codeFontFamily || null);
   scroll.setClickToPage(!!s.clickToPage);
+  scroll.setPaged({ paged: !!s.paged, columns: s.columns });
 
   const breaksChanged = state.renderOptions.breaks !== s.breaks;
   const propsChanged = state.renderOptions.showProperties !== s.showProperties;
@@ -168,7 +176,9 @@ async function applySettings(s) {
   if (breaksChanged || propsChanged) {
     await render({ markdown: state.source, path: state.path, position });
   } else {
-    // 縦⇔横ではスクロール軸が変わるので、ソースの位置を基準に合わせ直す
+    // 縦⇔横やページめくりの切替ではスクロールの仕方が変わるので、ソースの位置を基準に合わせ直す
+    await document.fonts.ready;
+    scroll.relayout();
     scroll.scrollToPosition(position);
   }
   scroll.notify();
@@ -274,6 +284,15 @@ content.addEventListener('click', (e) => {
   scroll.handleContentClick(e);
 });
 
+/**
+ * 割り付けを確定させてから少し待つ（書き出し用）。
+ * 書き出しの WebView は画面外のウインドウにあり requestAnimationFrame が止まるので、タイマーで待つ
+ */
+function nextFrame() {
+  content.getBoundingClientRect();
+  return new Promise((resolve) => setTimeout(resolve, 50));
+}
+
 function openHref(href, newTab) {
   if (!href) return;
   if (href.startsWith('#')) {
@@ -307,7 +326,7 @@ function scrollToFragment(fragment) {
   for (let p = el.parentElement; p; p = p.parentElement) {
     if (p.tagName === 'DETAILS') p.open = true;
   }
-  el.scrollIntoView({ block: 'start', inline: 'start' });
+  scroll.revealElement(el);
   return true;
 }
 
@@ -329,6 +348,21 @@ window.Shiori = {
   setExporting: (on) => {
     if (on) root.dataset.exporting = 'on';
     else delete root.dataset.exporting;
+  },
+  // 書き出し用: ページめくりの割り付けを紙向けの見た目で作り直し、ページ数を返す（使っていなければ 0）
+  preparePagedExport: async () => {
+    root.dataset.exporting = 'on';
+    await document.fonts.ready;
+    scroll.relayout();
+    scroll.goToPage(0);
+    await nextFrame();
+    return scroll.pageCount();
+  },
+  // 書き出し用: 1 ページ開いて描画が済むのを待つ
+  showPageForExport: async (index) => {
+    scroll.goToPage(index);
+    await nextFrame();
+    return true;
   },
   topPosition: () => scroll.topPosition(),
   scrollToPosition: (p) => scroll.scrollToPosition(p),

@@ -9,6 +9,8 @@ struct ViewerTheme: Identifiable, Hashable {
     /// ビューワーのページから見た CSS の場所
     let href: String
     let isUser: Bool
+    /// ページめくりで表示する（段組みを選べる）
+    var paged: Bool = false
 }
 
 /// 同梱テーマとユーザーの CSS テーマを管理する。
@@ -20,6 +22,8 @@ final class ThemeManager: ObservableObject {
         ViewerTheme(id: "default", name: "標準", summary: "普段のノートや技術文書に", href: "themes/default.css", isUser: false),
         ViewerTheme(id: "scientific", name: "科学文書", summary: "数式・図表が読みやすい論文調", href: "themes/scientific.css", isUser: false),
         ViewerTheme(id: "reading", name: "読書", summary: "紙の色と明朝で長文をじっくり", href: "themes/reading.css", isUser: false),
+        // 見た目は読書テーマのまま、スクロールではなくページをめくって読む
+        ViewerTheme(id: "book", name: "読書モード（ページめくり）", summary: "1 ページずつめくる。1 段・2 段組み", href: "themes/reading.css", isUser: false, paged: true),
         ViewerTheme(id: "github", name: "GitHub", summary: "README の確認に", href: "themes/github.css", isUser: false),
     ]
 

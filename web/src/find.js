@@ -1,5 +1,7 @@
 // 閲覧モードの検索。CSS Custom Highlight API で全一致を塗り、件数も返す。
 // ノードをまたぐ一致（縦中横の span をまたぐ場合など）も拾えるよう、本文を連結して検索する。
+import * as scroll from './scroll.js';
+
 const HL_ALL = 'shiori-find';
 const HL_CURRENT = 'shiori-find-current';
 const MAX_MATCHES = 5000;
@@ -74,12 +76,8 @@ export function run(query, rootEl) {
 }
 
 function firstVisibleIndex() {
-  const scroller = document.getElementById('scroller');
-  const box = scroller.getBoundingClientRect();
-  const vertical = document.documentElement.dataset.writing === 'vertical';
   for (let i = 0; i < ranges.length; i++) {
-    const r = ranges[i].getBoundingClientRect();
-    if (vertical ? r.right <= box.right : r.top >= box.top) return i;
+    if (scroll.isRangeAtOrAfterView(ranges[i])) return i;
   }
   return 0;
 }
@@ -94,16 +92,7 @@ function moveTo(i) {
   for (let p = range.startContainer.parentElement; p; p = p.parentElement) {
     if (p.tagName === 'DETAILS') p.open = true;
   }
-  const scroller = document.getElementById('scroller');
-  const box = scroller.getBoundingClientRect();
-  const r = range.getBoundingClientRect();
-  const inView = r.top >= box.top && r.bottom <= box.bottom && r.left >= box.left && r.right <= box.right;
-  if (!inView) {
-    scroller.scrollBy({
-      left: r.left + r.width / 2 - (box.left + box.width / 2),
-      top: r.top + r.height / 2 - (box.top + box.height / 2),
-    });
-  }
+  scroll.revealRange(range);
   return { count: ranges.length, index };
 }
 

@@ -121,7 +121,11 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
         document.querySelectorAll('#content details').forEach((d) => { d.open = true; });
         return Shiori.exportDocument();
         """
-        webView.callAsyncJavaScript(script, arguments: ["s": settings, "p": params], in: nil, in: .page) { [weak self] result in
+        // ページめくりは PDF と印刷でだけ使う（画面と同じ割り付けを 1 ページずつ紙にする）。
+        // HTML はスクロールで読むページなので段組みにしない
+        var exportSettings = settings
+        if !isPaged { exportSettings["paged"] = false }
+        webView.callAsyncJavaScript(script, arguments: ["s": exportSettings, "p": params], in: nil, in: .page) { [weak self] result in
             guard let self else { return }
             switch result {
             case .failure(let error):
@@ -130,6 +134,22 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
                 switch self.output {
                 case .html(let url):
                     self.writeHTML(value as? [String: Any] ?? [:], to: url)
+                case .pdf(let url) where self.isPaged:
+                    self.composePagedPDF { result in
+                        switch result {
+                        case .success(let document):
+                            self.finish(document.write(to: url) ? nil : CocoaError(.fileWriteUnknown))
+                        case .failure(let error):
+                            self.finish(error)
+                        }
+                    }
+                case .print where self.isPaged:
+                    self.composePagedPDF { result in
+                        switch result {
+                        case .success(let document): self.showPrintPanel(for: document)
+                        case .failure(let error): self.finish(error)
+                        }
+                    }
                 case .pdf(let url):
                     if self.isVertical {
                         self.composeVerticalPDF { result in
@@ -160,6 +180,80 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
     }
 
     private var isVertical: Bool { (settings["writing"] as? String) == "vertical" }
+
+    /// ページめくりのテーマで、紙にも同じ割り付け（段組み）で出す
+    private var isPaged: Bool {
+        guard settings["paged"] as? Bool == true else { return false }
+        switch output {
+        case .pdf, .print: return true
+        case .html: return false
+        }
+    }
+
+    // MARK: - ページめくりの PDF
+
+    /// 画面のページめくりと同じ割り付けを A4 の大きさで作り、1 ページずつ取り込んで PDF にする。
+    /// 書き出し用の WebView は A4 と同じ縦横比なので、取り込んだ 1 枚をそのまま 1 ページに縮める。
+    /// 縦書き・2 段組みもそのまま紙になる
+    private func composePagedPDF(completion: @escaping (Result<PDFDocument, Error>) -> Void) {
+        webView.callAsyncJavaScript("return await Shiori.preparePagedExport();", arguments: [:], in: nil, in: .page) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success(let value):
+                let count = (value as? NSNumber)?.intValue ?? 0
+                guard count > 0 else {
+                    completion(.failure(CocoaError(.fileWriteUnknown)))
+                    return
+                }
+                self.capturePage(0, of: count, into: PDFDocument(), completion: completion)
+            }
+        }
+    }
+
+    private func capturePage(_ index: Int, of count: Int, into document: PDFDocument,
+                             completion: @escaping (Result<PDFDocument, Error>) -> Void) {
+        guard index < count else {
+            completion(.success(document))
+            return
+        }
+        webView.callAsyncJavaScript("return await Shiori.showPageForExport(i);", arguments: ["i": index], in: nil, in: .page) { [weak self] _ in
+            guard let self else { return }
+            self.webView.createPDF(configuration: WKPDFConfiguration()) { [weak self] result in
+                guard let self else { return }
+                switch result {
+                case .failure(let error):
+                    completion(.failure(error))
+                case .success(let data):
+                    if let page = Self.fitOnPaper(data) {
+                        document.insert(page, at: document.pageCount)
+                    }
+                    self.capturePage(index + 1, of: count, into: document, completion: completion)
+                }
+            }
+        }
+    }
+
+    /// 取り込んだ 1 枚（画面の 1 ページ）を A4 いっぱいに縮めて置く。余白はページめくりの割り付けが持っている
+    private static func fitOnPaper(_ data: Data) -> PDFPage? {
+        guard let source = PDFDocument(data: data)?.page(at: 0) else { return nil }
+        let bounds = source.bounds(for: .mediaBox)
+        guard bounds.width > 0, bounds.height > 0 else { return nil }
+        let scale = min(pageSize.width / bounds.width, pageSize.height / bounds.height)
+        let output = NSMutableData()
+        var media = CGRect(origin: .zero, size: pageSize)
+        guard let consumer = CGDataConsumer(data: output as CFMutableData),
+              let context = CGContext(consumer: consumer, mediaBox: &media, nil) else { return nil }
+        context.beginPDFPage(nil)
+        context.translateBy(x: (pageSize.width - bounds.width * scale) / 2, y: (pageSize.height - bounds.height * scale) / 2)
+        context.scaleBy(x: scale, y: scale)
+        context.clip(to: CGRect(origin: .zero, size: bounds.size))
+        source.draw(with: .mediaBox, to: context)
+        context.endPDFPage()
+        context.closePDF()
+        return PDFDocument(data: output as Data)?.page(at: 0)
+    }
 
     // MARK: - 縦書きの PDF
 

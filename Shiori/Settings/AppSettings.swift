@@ -29,6 +29,22 @@ enum ExternalOpenMode: String, CaseIterable, Identifiable {
     var label: String { self == .existingWindow ? "開いているウインドウのタブで開く" : "新しいウインドウで開く" }
 }
 
+/// ファイラーの並び順
+enum FilerSortKey: String, CaseIterable, Identifiable {
+    case name, modified, created, kind
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .name: return "名前"
+        case .modified: return "更新日"
+        case .created: return "作成日"
+        case .kind: return "種類"
+        }
+    }
+    /// この並び順を選んだときの向き（日付は新しい順を先にする）
+    var defaultAscending: Bool { self == .name || self == .kind }
+}
+
 /// 外観
 enum AppearanceChoice: String, CaseIterable, Identifiable {
     case system, light, dark
@@ -70,6 +86,9 @@ final class AppSettings: ObservableObject {
     @Published var showHiddenFiles: Bool { didSet { defaults.set(showHiddenFiles, forKey: Keys.showHiddenFiles) } }
     @Published var filerOpenMode: FilerOpenMode { didSet { defaults.set(filerOpenMode.rawValue, forKey: Keys.filerOpenMode) } }
     @Published var externalOpenMode: ExternalOpenMode { didSet { defaults.set(externalOpenMode.rawValue, forKey: Keys.externalOpenMode) } }
+    @Published var filerSortKey: FilerSortKey { didSet { defaults.set(filerSortKey.rawValue, forKey: Keys.filerSortKey) } }
+    @Published var filerSortAscending: Bool { didSet { defaults.set(filerSortAscending, forKey: Keys.filerSortAscending) } }
+    @Published var filerFoldersFirst: Bool { didSet { defaults.set(filerFoldersFirst, forKey: Keys.filerFoldersFirst) } }
 
     // ビューワー
     @Published var themeID: String { didSet { defaults.set(themeID, forKey: Keys.themeID) } }
@@ -98,6 +117,9 @@ final class AppSettings: ObservableObject {
         static let themeID = "themeID"
         static let filerOpenMode = "filerOpenMode"
         static let externalOpenMode = "externalOpenMode"
+        static let filerSortKey = "filerSortKey"
+        static let filerSortAscending = "filerSortAscending"
+        static let filerFoldersFirst = "filerFoldersFirst"
         static let themeStyles = "themeStyles"
         static let breaks = "breaks"
         static let showProperties = "showProperties"
@@ -117,6 +139,8 @@ final class AppSettings: ObservableObject {
             Keys.showProperties: true,
             Keys.editorFontSize: 14.0,
             Keys.editorLimitWidth: true,
+            Keys.filerSortAscending: true,
+            Keys.filerFoldersFirst: true,
         ])
         defaultOpenMode = DocMode(rawValue: d.string(forKey: Keys.defaultOpenMode) ?? "") ?? .read
         appearance = AppearanceChoice(rawValue: d.string(forKey: Keys.appearance) ?? "") ?? .system
@@ -126,6 +150,9 @@ final class AppSettings: ObservableObject {
         themeID = d.string(forKey: Keys.themeID) ?? "default"
         filerOpenMode = FilerOpenMode(rawValue: d.string(forKey: Keys.filerOpenMode) ?? "") ?? .replace
         externalOpenMode = ExternalOpenMode(rawValue: d.string(forKey: Keys.externalOpenMode) ?? "") ?? .existingWindow
+        filerSortKey = FilerSortKey(rawValue: d.string(forKey: Keys.filerSortKey) ?? "") ?? .name
+        filerSortAscending = d.bool(forKey: Keys.filerSortAscending)
+        filerFoldersFirst = d.bool(forKey: Keys.filerFoldersFirst)
         themeStyles = d.data(forKey: Keys.themeStyles).flatMap { try? JSONDecoder().decode([String: ViewStyle].self, from: $0) } ?? [:]
         breaks = d.bool(forKey: Keys.breaks)
         showProperties = d.bool(forKey: Keys.showProperties)

@@ -1,5 +1,6 @@
 // スクロール制御。縦書きでは軸が横になり起点が右端になるので、差異をここに閉じ込める。
 import { post } from './bridge.js';
+import * as paged from './paged.js';
 
 let scroller;
 let content;
@@ -14,10 +15,61 @@ const isVertical = () => root.dataset.writing === 'vertical';
 
 export function init(refs) {
   ({ scroller, content } = refs);
-  scroller.addEventListener('scroll', schedule, { passive: true });
+  paged.init(refs);
+  scroller.addEventListener('scroll', onScroll, { passive: true });
   scroller.addEventListener('wheel', onWheel, { passive: false });
   window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('resize', schedule);
+  window.addEventListener('resize', onResize);
+}
+
+let resizeTimer = null;
+function onResize() {
+  if (paged.active()) {
+    // 段組みは窓の大きさで割り付けが変わるので、落ち着いてから同じ箇所のページを開き直す
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      paged.relayoutKeepingPosition();
+      notify();
+    }, 120);
+    return;
+  }
+  schedule();
+}
+
+function onScroll() {
+  if (paged.active()) {
+    // ページめくりでは scroller 自体は動かさない。選択などで動いたら、その位置を含むページへ移し替える
+    if (scroller.scrollTop || scroller.scrollLeft) {
+      scroller.scrollTop = 0;
+      scroller.scrollLeft = 0;
+    }
+    return;
+  }
+  schedule();
+}
+
+/** ページめくり表示の設定（テーマと段組み）。割り付けは relayout で行う */
+export function setPaged(options) {
+  paged.configure(options);
+}
+
+/** 本文や設定が変わったあと、ページめくりの割り付けを作り直す（使わないときは解除する） */
+export function relayout() {
+  paged.layout();
+}
+
+export function isPaged() {
+  return paged.active();
+}
+
+/** 書き出し用: ページめくりのページ数（使っていなければ 0） */
+export function pageCount() {
+  return paged.count();
+}
+
+/** 書き出し用: 指定のページを開く（動きは付けない） */
+export function goToPage(index) {
+  paged.go(index);
 }
 
 export function resetInteraction() {
@@ -52,8 +104,13 @@ function canScrollInside(el, dx, dy) {
 
 function onWheel(e) {
   interacted = true;
-  if (!isVertical()) return;
   if (!(e.target instanceof Element)) return;
+  if (paged.active()) {
+    if (canScrollInside(e.target, e.deltaX, e.deltaY)) return;
+    if (paged.wheel(e)) notify();
+    return;
+  }
+  if (!isVertical()) return;
   // 縦ホイールを横スクロールへ読み替える（下へ回すと読み進む＝左へ）
   if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
     if (canScrollInside(e.target, 0, e.deltaY)) return;
@@ -70,6 +127,10 @@ function lineExtent() {
 /** 1 画面ぶん進める・戻す。行の途中で切れないよう行単位に丸める */
 export function page(direction) {
   interacted = true;
+  if (paged.active()) {
+    if (paged.turn(direction)) notify();
+    return;
+  }
   const line = lineExtent();
   if (isVertical()) {
     const lines = Math.max(1, Math.floor(scroller.clientWidth / line) - 1);
@@ -90,6 +151,13 @@ function stepLine(direction) {
 function onKeyDown(e) {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+  if (paged.active()) {
+    if (!paged.key(e)) return;
+    interacted = true;
+    e.preventDefault();
+    notify();
+    return;
+  }
   const vertical = isVertical();
   switch (e.key) {
     case ' ':
@@ -131,8 +199,14 @@ function onKeyDown(e) {
 
 /** クリックでのページ送り（画面の端をクリック） */
 export function handleContentClick(e) {
-  if (!clickToPage) return;
   if (window.getSelection()?.toString()) return;
+  // ページめくりでは端のクリックで常にめくれる（電子書籍と同じ操作）
+  if (paged.active()) {
+    interacted = true;
+    if (paged.click(e)) notify();
+    return;
+  }
+  if (!clickToPage) return;
   const x = e.clientX / window.innerWidth;
   const y = e.clientY / window.innerHeight;
   if (isVertical()) {
@@ -145,11 +219,19 @@ export function handleContentClick(e) {
 }
 
 export function scrollToStart() {
+  if (paged.active()) {
+    paged.first();
+    return;
+  }
   if (isVertical()) scroller.scrollLeft = 0;
   else scroller.scrollTop = 0;
 }
 
 export function scrollToEnd() {
+  if (paged.active()) {
+    paged.last();
+    return;
+  }
   if (isVertical()) scroller.scrollLeft = -(scroller.scrollWidth - scroller.clientWidth);
   else scroller.scrollTop = scroller.scrollHeight;
 }
@@ -170,6 +252,7 @@ function scrollOffset() {
 }
 
 export function topPosition() {
+  if (paged.active()) return paged.topPosition();
   // 合わせたあとユーザーが動かしていなければ、合わせた位置をそのまま返す
   if (pinned && Math.abs(scrollOffset() - pinned.offset) < 1 && pinned.writing === root.dataset.writing) {
     return pinned.position;
@@ -204,6 +287,12 @@ export function topLine() {
 /** topPosition で得た位置が画面の先頭に来るようにスクロールする */
 export function scrollToPosition(position) {
   pinned = null;
+  if (paged.active()) {
+    paged.scrollToPosition(position);
+    // ページめくりではスクロールのイベントが起きないので、移ったことを自分で知らせる（進み具合と目次の現在位置）
+    notify();
+    return;
+  }
   if (!(position > 0)) {
     scrollToStart();
     return;
@@ -232,6 +321,48 @@ export function scrollToPosition(position) {
 /** 指定行のブロックが画面の先頭に来るようにスクロールする（目次から飛ぶとき） */
 export function scrollToLine(n) {
   scrollToPosition(n);
+}
+
+/** 要素を見える所へ出す（ページ内リンク）。ページめくりではその要素のあるページを開く */
+export function revealElement(el) {
+  if (paged.active()) {
+    paged.reveal(el);
+    notify();
+    return;
+  }
+  el.scrollIntoView({ block: 'start', inline: 'start' });
+}
+
+/** 検索の一致箇所が見えているか */
+export function isRangeInView(range) {
+  const r = range.getBoundingClientRect();
+  if (paged.active()) return paged.isOnCurrentPage(r);
+  const box = scroller.getBoundingClientRect();
+  return r.top >= box.top && r.bottom <= box.bottom && r.left >= box.left && r.right <= box.right;
+}
+
+/** 今見ている所以降にあるか（検索を見ている所から始めるため） */
+export function isRangeAtOrAfterView(range) {
+  const r = range.getBoundingClientRect();
+  if (paged.active()) return paged.isAtOrAfterCurrentPage(r);
+  const box = scroller.getBoundingClientRect();
+  return isVertical() ? r.right <= box.right : r.top >= box.top;
+}
+
+/** 検索の一致箇所を画面の中央へ出す。ページめくりではそのページを開く */
+export function revealRange(range) {
+  if (isRangeInView(range)) return;
+  if (paged.active()) {
+    paged.reveal(range);
+    notify();
+    return;
+  }
+  const box = scroller.getBoundingClientRect();
+  const r = range.getBoundingClientRect();
+  scroller.scrollBy({
+    left: r.left + r.width / 2 - (box.left + box.width / 2),
+    top: r.top + r.height / 2 - (box.top + box.height / 2),
+  });
 }
 
 /**
@@ -293,6 +424,7 @@ export function verticalPageSlices(pageWidth) {
 }
 
 function progress() {
+  if (paged.active()) return paged.progress();
   if (isVertical()) {
     const max = scroller.scrollWidth - scroller.clientWidth;
     return max > 0 ? Math.min(1, -scroller.scrollLeft / max) : 1;

@@ -39,6 +39,21 @@ final class ViewStyleTests: XCTestCase {
         XCTAssertTrue(style.indent)
     }
 
+    func test段組みがない古い保存データは1段になる() throws {
+        let old = #"{"writing":"vertical","fontScale":1,"lineHeight":0,"measure":0,"fontChoice":"theme","customFontName":"","indent":false,"justify":false,"headingNumbers":false}"#
+        let style = try JSONDecoder().decode(ViewStyle.self, from: Data(old.utf8))
+        XCTAssertEqual(style.columns, 1)
+        XCTAssertEqual(style.writing, .vertical)
+    }
+
+    func test段組みも調整で上書きできる() {
+        let base = ViewStyle(columns: 1)
+        var overrides = ViewOverrides()
+        overrides.columns = 2
+        XCTAssertEqual(overrides.applied(to: base).columns, 2)
+        XCTAssertEqual(ViewOverrides().applied(to: base).columns, 1)
+    }
+
     func test読書位置を保存して読み戻せる() throws {
         let data = try JSONEncoder().encode(FileViewState(line: 12.5))
         XCTAssertEqual(try JSONDecoder().decode(FileViewState.self, from: data).line, 12.5)

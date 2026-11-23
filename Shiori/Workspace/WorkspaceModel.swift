@@ -47,6 +47,8 @@ final class WorkspaceModel: ObservableObject {
     let editor = EditorController()
 
     weak var windowController: MainWindowController?
+    /// タブ欄に並んでいるタブの位置（ウインドウの座標）。別のウインドウからタブを落とされたときの差し込み先に使う
+    var tabFramesInWindow: [UUID: CGRect] = [:]
 
     private var watcher: FSWatcher?
     private var autosaveWork: DispatchWorkItem?
@@ -183,14 +185,14 @@ final class WorkspaceModel: ObservableObject {
         add(DocumentTab(mode: .edit))
     }
 
-    private func add(_ tab: DocumentTab) {
+    private func add(_ tab: DocumentTab, at index: Int? = nil) {
         tab.onEdited = { [weak self, weak tab] in
             guard let self, let tab else { return }
             self.documentEdited(tab)
         }
         captureCurrentPositions()
         if let current = activeTab { _ = flush(current) }
-        tabs.append(tab)
+        if let index { tabs.insert(tab, at: max(0, min(index, tabs.count))) } else { tabs.append(tab) }
         activeTabID = tab.id
         presentActive()
     }
@@ -220,6 +222,56 @@ final class WorkspaceModel: ObservableObject {
         guard tabs.indices.contains(source), destination >= 0, destination <= tabs.count else { return }
         let tab = tabs.remove(at: source)
         tabs.insert(tab, at: destination > source ? destination - 1 : destination)
+    }
+
+    /// タブの並べ替えが終わったとき（次の起動でも同じ順に開く）
+    func tabsReordered() {
+        persistSession()
+    }
+
+    // MARK: - タブを別のウインドウへ移す
+
+    /// 別のウインドウへ移すため、タブをこのウインドウから外す。
+    /// 閉じるのではないので、保存の確認はせず、編集中の内容も取り消し履歴もタブごと持っていく
+    @discardableResult
+    func detachForTransfer(_ tab: DocumentTab) -> Bool {
+        guard let position = tabs.firstIndex(where: { $0.id == tab.id }) else { return false }
+        let wasActive = tab.id == activeTabID
+        // 閲覧・編集の位置をタブへ書き戻してから外す
+        if wasActive { captureCurrentPositions() }
+        editor.detach(tab)
+        tab.onEdited = nil
+        autosaveWork?.cancel()
+        tabs.remove(at: position)
+        if wasActive {
+            activeTabID = tabs.isEmpty ? nil : tabs[min(position, tabs.count - 1)].id
+            presentActive()
+        }
+        updateWatcher()
+        persistSession()
+        return true
+    }
+
+    /// ウインドウの x 座標に落とされたタブを差し込む位置
+    func insertionIndex(atWindowX x: CGFloat) -> Int {
+        tabs.filter { (tabFramesInWindow[$0.id]?.midX ?? .infinity) < x }.count
+    }
+
+    /// 別のウインドウから移ってきたタブを受け取る。index を省くと末尾に置く
+    func adopt(_ tab: DocumentTab, at index: Int? = nil) {
+        // 同じファイルをすでに開いていれば、そちらを見せる（未保存の変更があるときは失わないよう別のタブのまま受け取る）
+        if let url = tab.url?.standardizedFileURL,
+           let existing = tabs.first(where: { $0.url?.standardizedFileURL == url }),
+           !tab.isDirty {
+            if existing.id == activeTabID { presentActive() } else { activate(existing) }
+            return
+        }
+        if rootURL == nil, let url = tab.url { setRoot(url.deletingLastPathComponent()) }
+        add(tab, at: index)
+        // 編集中に移したときは、自動保存の予約を受け取った側で掛け直す
+        if tab.isDirty { documentEdited(tab) }
+        updateWatcher()
+        persistSession()
     }
 
     /// タブを閉じる。未保存なら確認する。閉じられなかったら false
@@ -630,6 +682,8 @@ final class WorkspaceModel: ObservableObject {
             "breaks": s.breaks,
             "showProperties": s.showProperties,
             "clickToPage": s.clickToPage,
+            "paged": theme.paged,
+            "columns": style.columns,
         ]
         if let font = style.fontFamilyCSS { payload["fontFamily"] = font }
         if s.useCustomCSS, let href = manager.customCSSHref { payload["customHref"] = href }

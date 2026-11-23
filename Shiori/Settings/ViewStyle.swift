@@ -15,6 +15,8 @@ struct ViewStyle: Codable, Equatable {
     var indent = false
     var justify = false
     var headingNumbers = false
+    /// 段組み（ページめくりのテーマでだけ使う）。1 か 2
+    var columns = 1
 
     /// CSS の font-family 値。テーマの既定を使うときは nil
     var fontFamilyCSS: String? {
@@ -31,7 +33,7 @@ struct ViewStyle: Codable, Equatable {
 
     init(writing: WritingMode = .horizontal, fontScale: Double = 1, lineHeight: Double = 0, measure: Double = 0,
          fontChoice: FontChoice = .theme, customFontName: String = "", indent: Bool = false, justify: Bool = false,
-         headingNumbers: Bool = false) {
+         headingNumbers: Bool = false, columns: Int = 1) {
         self.writing = writing
         self.fontScale = fontScale
         self.lineHeight = lineHeight
@@ -41,6 +43,7 @@ struct ViewStyle: Codable, Equatable {
         self.indent = indent
         self.justify = justify
         self.headingNumbers = headingNumbers
+        self.columns = columns
     }
 
     /// 項目が足りない古い保存データも、足りない項目を初期値にして読む
@@ -56,6 +59,7 @@ struct ViewStyle: Codable, Equatable {
         indent = try c.decodeIfPresent(Bool.self, forKey: .indent) ?? base.indent
         justify = try c.decodeIfPresent(Bool.self, forKey: .justify) ?? base.justify
         headingNumbers = try c.decodeIfPresent(Bool.self, forKey: .headingNumbers) ?? base.headingNumbers
+        columns = try c.decodeIfPresent(Int.self, forKey: .columns) ?? base.columns
     }
 
     static func scaledUp(_ value: Double) -> Double { min(3.0, (value * 10 + 1).rounded() / 10) }
@@ -75,6 +79,7 @@ struct ViewOverrides: Codable, Equatable {
     var indent: Bool?
     var justify: Bool?
     var headingNumbers: Bool?
+    var columns: Int?
 
     var isEmpty: Bool { self == ViewOverrides() }
 
@@ -90,6 +95,7 @@ struct ViewOverrides: Codable, Equatable {
         if let indent { style.indent = indent }
         if let justify { style.justify = justify }
         if let headingNumbers { style.headingNumbers = headingNumbers }
+        if let columns { style.columns = columns }
         return style
     }
 }

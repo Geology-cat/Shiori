@@ -107,6 +107,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SessionStore.save(windowControllers.map { $0.workspace.sessionState() })
     }
 
+    // MARK: - タブの移動
+
+    /// タブを引き出して離したとき。
+    /// 別の Shiori のウインドウのタブ欄のあたりで離したらそのウインドウのタブにし（離した位置に差し込む）、
+    /// それ以外（元のウインドウの中も含む）で離したら新しいウインドウにする。
+    /// 新しいウインドウは CLAUDE.md の方針どおり既定の表示で始まる（元のウインドウの調整は引き継がない）
+    func moveTab(_ tab: DocumentTab, from source: MainWindowController, to screenPoint: NSPoint) {
+        let workspace = source.workspace
+        guard workspace.tabs.contains(where: { $0.id == tab.id }) else { return }
+
+        if let target = tabBarTarget(at: screenPoint), target !== source {
+            let index = target.window.map { target.workspace.insertionIndex(atWindowX: $0.convertPoint(fromScreen: screenPoint).x) }
+            workspace.detachForTransfer(tab)
+            bringToFront(target)
+            target.workspace.adopt(tab, at: index)
+            // タブが 1 つもなくなったウインドウは閉じる（ウインドウをまとめる操作になる）
+            if workspace.tabs.isEmpty { source.window?.close() }
+            return
+        }
+        // タブが 1 つしかないときは新しいウインドウにしない（元のウインドウが空になるだけなので）
+        guard workspace.tabs.count > 1 else { return }
+
+        // サイドバーは元のウインドウと同じフォルダを開く（そのフォルダの外のファイルならファイルのあるフォルダ）
+        var root = workspace.rootURL
+        if let url = tab.url?.standardizedFileURL {
+            let rootPath = root.map { $0.path.hasSuffix("/") ? $0.path : $0.path + "/" }
+            if rootPath == nil || !url.path.hasPrefix(rootPath!) { root = url.deletingLastPathComponent() }
+        }
+        let size = source.window?.frame.size
+        workspace.detachForTransfer(tab)
+        let newController = makeWindow(root: root)
+        if let window = newController.window, let size {
+            // 離した所にタブ欄が来るよう、ウインドウの左上をカーソルの近くに置く
+            var frame = NSRect(x: screenPoint.x - 140, y: screenPoint.y - size.height + 16, width: size.width, height: size.height)
+            if let screen = NSScreen.screens.first(where: { $0.frame.contains(screenPoint) }) ?? window.screen {
+                frame = window.constrainFrameRect(frame, to: screen)
+            }
+            window.setFrame(frame, display: true)
+        }
+        newController.workspace.sidebarVisible = workspace.sidebarVisible
+        newController.workspace.sidebarWidth = workspace.sidebarWidth
+        newController.workspace.adopt(tab)
+        saveSession()
+    }
+
+    /// 画面上の点が、どの Shiori のウインドウのタブ欄のあたりにあるか（いちばん手前のウインドウで判定する）
+    func tabBarTarget(at screenPoint: NSPoint) -> MainWindowController? {
+        let number = NSWindow.windowNumber(at: screenPoint, belowWindowWithWindowNumber: 0)
+        guard let controller = windowControllers.first(where: { $0.window?.windowNumber == number && $0.window?.isVisible == true }),
+              let window = controller.window else { return nil }
+        // 上部バー（32pt）より少し下まで「タブ欄のあたり」とみなす
+        let fromTop = window.frame.maxY - screenPoint.y
+        return fromTop <= 60 ? controller : nil
+    }
+
     // MARK: - Finder などから開く
 
     /// どこから開こうとしているか
