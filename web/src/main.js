@@ -6,6 +6,7 @@ import * as scroll from './scroll.js';
 import * as find from './find.js';
 import { initLightbox, openLightbox } from './lightbox.js';
 import { post } from './bridge.js';
+import { loadEmbed, framesForExport, matchEmbed } from './embed.js';
 
 const root = document.documentElement;
 const scroller = document.getElementById('scroller');
@@ -15,6 +16,10 @@ const state = {
   source: '',
   path: null,
   renderOptions: { breaks: true, showProperties: true },
+  // 外部の埋め込みを開いたときに読み込むか（既定はクリックしてから）
+  autoloadEmbeds: false,
+  // この文書でクリックして読み込んだ埋め込み。描き直しても読み込んだままにする
+  loadedEmbeds: new Set(),
   token: 0,
   mode: 'empty', // 'empty' | 'markdown' | 'image'
   appearance: null,
@@ -32,6 +37,7 @@ function appearance() {
 async function render({ markdown, path = null, position = null, keepPosition = false }) {
   const token = ++state.token;
   const previousPosition = keepPosition ? scroll.topPosition() : null;
+  if (path !== state.path) state.loadedEmbeds.clear();
   state.source = markdown;
   state.path = path;
   state.mode = 'markdown';
@@ -49,6 +55,9 @@ async function render({ markdown, path = null, position = null, keepPosition = f
   await resolveWikiEmbeds(fragment, path, state.renderOptions);
   if (token !== state.token) return { stale: true };
   addCodeButtons(fragment);
+  for (const box of fragment.querySelectorAll('.web-embed')) {
+    if (state.autoloadEmbeds || state.loadedEmbeds.has(box.dataset.embedSrc)) loadEmbed(box, { lazy: true });
+  }
 
   content.className = 'shiori-doc';
   content.replaceChildren(fragment);
@@ -171,9 +180,11 @@ async function applySettings(s) {
 
   const breaksChanged = state.renderOptions.breaks !== s.breaks;
   const propsChanged = state.renderOptions.showProperties !== s.showProperties;
+  const embedsChanged = state.autoloadEmbeds !== !!s.autoloadEmbeds;
   state.renderOptions = { breaks: !!s.breaks, showProperties: !!s.showProperties };
+  state.autoloadEmbeds = !!s.autoloadEmbeds;
 
-  if (breaksChanged || propsChanged) {
+  if (breaksChanged || propsChanged || embedsChanged) {
     await render({ markdown: state.source, path: state.path, position });
   } else {
     // 縦⇔横やページめくりの切替ではスクロールの仕方が変わるので、ソースの位置を基準に合わせ直す
@@ -206,6 +217,8 @@ function syncAppearance() {
 function exportDocument() {
   const clone = content.cloneNode(true);
   clone.querySelectorAll('.copy-btn').forEach((el) => el.remove());
+  // 書き出した HTML はブラウザで開くので、埋め込みは本物の iframe に戻す
+  framesForExport(clone);
   return {
     html: clone.innerHTML,
     hasMath: !!content.querySelector('.katex'),
@@ -252,6 +265,22 @@ content.addEventListener('click', (e) => {
     post('copy', { text: code?.textContent ?? '' });
     copy.textContent = 'コピーしました';
     setTimeout(() => { copy.textContent = 'コピー'; }, 1200);
+    return;
+  }
+
+  const embed = target.closest('.web-embed-load');
+  if (embed) {
+    e.preventDefault();
+    const box = embed.closest('.web-embed');
+    // data-* は md の作者も書けるので、開き先は許可リストから求め直す
+    const hit = matchEmbed(box?.dataset.embedSrc);
+    if (!hit) return;
+    if (hit.browserURL) {
+      post('openExternal', { url: hit.browserURL });
+      return;
+    }
+    state.loadedEmbeds.add(box.dataset.embedSrc);
+    loadEmbed(box);
     return;
   }
 

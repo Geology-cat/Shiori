@@ -371,7 +371,7 @@ export function revealRange(range) {
  * 位置は本文の右端からの距離で返す。
  */
 export function verticalPageSlices(pageWidth) {
-  const ISLANDS = '.code-block, .table-wrap, .math-block, .diagram, .properties, .toc, figure, img, svg, .callout-title';
+  const ISLANDS = '.code-block, .table-wrap, .math-block, .diagram, .properties, .toc, figure, img, svg, .callout-title, .web-embed';
   const box = content.getBoundingClientRect();
   const right = box.right;
   const intervals = [];

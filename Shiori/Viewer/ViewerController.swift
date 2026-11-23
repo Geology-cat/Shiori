@@ -61,6 +61,7 @@ final class ViewerController: NSObject {
         super.init()
         proxy.target = self
         webView.navigationDelegate = self
+        webView.uiDelegate = self
         webView.load(URLRequest(url: ShioriSchemeHandler.shellURL))
     }
 
@@ -187,6 +188,18 @@ extension ViewerController: WKNavigationDelegate {
             decisionHandler(.allow)
             return
         }
+        // 埋め込み（iframe）の中の読み込み。どの提供元を枠に入れられるかは viewer.html の CSP と
+        // web/src/embed.js の許可リストで絞っている。枠の中でリンクを押したときはブラウザで開く
+        if let frame = action.targetFrame, !frame.isMainFrame {
+            if action.navigationType == .linkActivated {
+                decisionHandler(.cancel)
+                if let url = action.request.url, Self.isWebURL(url) { delegate?.viewerOpenExternal(url) }
+                return
+            }
+            let scheme = action.request.url?.scheme?.lowercased() ?? ""
+            decisionHandler(["https", "about", "blob", "data"].contains(scheme) ? .allow : .cancel)
+            return
+        }
         decisionHandler(.cancel)
         if action.navigationType == .linkActivated, let url = action.request.url {
             delegate?.viewerOpenExternal(url)
@@ -199,6 +212,20 @@ extension ViewerController: WKNavigationDelegate {
         renderedTabID = nil
         renderedVersion = -1
         webView.load(URLRequest(url: ShioriSchemeHandler.shellURL))
+    }
+
+    static func isWebURL(_ url: URL) -> Bool {
+        let scheme = url.scheme?.lowercased()
+        return scheme == "https" || scheme == "http"
+    }
+}
+
+extension ViewerController: WKUIDelegate {
+    /// 埋め込みの中から新しいウインドウを開こうとしたとき（「Google マップで見る」など）はブラウザで開く
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if let url = action.request.url, Self.isWebURL(url) { delegate?.viewerOpenExternal(url) }
+        return nil
     }
 }
 

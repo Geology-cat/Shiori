@@ -119,6 +119,16 @@ export function createMarkdown({ breaks = true } = {}) {
   md.use(container, 'callout', containerCallout(md));
 
   md.renderer.rules.fence = renderFence;
+  // 生 HTML のブロックには行番号が付かない。iframe（地図などの埋め込み）は大きいので、
+  // 閲覧⇔編集で位置がずれないよう行番号つきの div で包む（他の HTML はそのまま出す）
+  const htmlBlock = md.renderer.rules.html_block;
+  md.renderer.rules.html_block = (tokens, idx, options, env, self) => {
+    const token = tokens[idx];
+    if (/^\s*<iframe[\s>]/i.test(token.content)) {
+      return `<div class="html-block"${lineAttrs(token)}>\n${token.content}</div>\n`;
+    }
+    return htmlBlock(tokens, idx, options, env, self);
+  };
   md.renderer.rules.code_block = (tokens, idx, _o, _e) => {
     const lineAttr = lineAttrs(tokens[idx]);
     return `<div class="code-block"${lineAttr}><pre><code class="hljs">${escapeHtml(tokens[idx].content)}</code></pre></div>\n`;

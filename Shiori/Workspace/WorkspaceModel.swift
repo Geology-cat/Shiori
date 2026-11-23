@@ -682,6 +682,7 @@ final class WorkspaceModel: ObservableObject {
             "breaks": s.breaks,
             "showProperties": s.showProperties,
             "clickToPage": s.clickToPage,
+            "autoloadEmbeds": s.autoloadEmbeds,
             "paged": theme.paged,
             "columns": style.columns,
         ]

@@ -113,6 +113,8 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
         if let path { params["path"] = path }
         let script = """
         Shiori.setForcedAppearance('light');
+        // 書き出しでは埋め込みを読み込まない（PDF に取り込めないため）。紙には提供元と URL を載せる
+        document.documentElement.dataset.print = 'on';
         await Shiori.applySettings(s);
         await Shiori.render(p);
         await Promise.all(Array.from(document.images).map((img) => img.complete ? null : img.decode().catch(() => null)));
@@ -125,6 +127,7 @@ final class Exporter: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WK
         // HTML はスクロールで読むページなので段組みにしない
         var exportSettings = settings
         if !isPaged { exportSettings["paged"] = false }
+        exportSettings["autoloadEmbeds"] = false
         webView.callAsyncJavaScript(script, arguments: ["s": exportSettings, "p": params], in: nil, in: .page) { [weak self] result in
             guard let self else { return }
             switch result {

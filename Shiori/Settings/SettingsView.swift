@@ -131,6 +131,16 @@ private struct ViewerTab: View {
                 Toggle("フロントマターのプロパティを表示する", isOn: $settings.showProperties)
                 Toggle("画面の端をクリックしてページ送りする", isOn: $settings.clickToPage)
             }
+
+            Section {
+                Toggle("Google マップなどの埋め込みを自動で読み込む", isOn: $settings.autoloadEmbeds)
+            } header: {
+                Text("外部の埋め込み")
+            } footer: {
+                Text("オフのときは、埋め込みをクリックしてから読み込みます。読み込むと、そのサービスに通信します。表示できるのは Google マップ、OpenStreetMap、Vimeo、Google カレンダー、ウェブに公開した Google ドキュメントです。YouTube はアプリの中では再生できないため、クリックするとブラウザで開きます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }

@@ -561,6 +561,51 @@ details:not(.callout):not(.properties) > summary { cursor: pointer; }
   color: var(--muted);
 }
 
+/* 外部の埋め込み（Google マップ、YouTube など）。読み込む前後で大きさが変わらないよう縦横比で枠を取る */
+.web-embed {
+  margin-block: 0 var(--block-gap);
+  inline-size: 100%;
+  max-inline-size: var(--embed-width, 100%);
+  aspect-ratio: var(--embed-ratio, 4 / 3);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--fg, currentColor) 4%, transparent);
+}
+.web-embed iframe { display: block; inline-size: 100%; block-size: 100%; border: 0; }
+.web-embed-load {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+  inline-size: 100%;
+  block-size: 100%;
+  padding: 1em;
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+.web-embed-load:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.web-embed-load:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.web-embed-provider { font-weight: 600; color: var(--fg, inherit); }
+.web-embed-hint { color: var(--accent); }
+.web-embed-url {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82em;
+  color: var(--faint);
+}
+/* 紙には読み込みの案内を出さない */
+:root[data-print="on"] .web-embed-hint { display: none; }
+:root[data-print="on"] .web-embed-url { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+.web-embed-blocked { font-size: 0.85em; color: var(--faint); overflow-wrap: anywhere; }
+
 /* 検索の強調 */
 ::highlight(shiori-find) { background: color-mix(in srgb, var(--mark-bg) 75%, transparent); }
 ::highlight(shiori-find-current) { background: #ff9f43; color: #1b1d21; }
@@ -646,6 +691,7 @@ details:not(.callout):not(.properties) > summary { cursor: pointer; }
 :root[data-writing="vertical"] .diagram,
 :root[data-writing="vertical"] .properties,
 :root[data-writing="vertical"] .toc,
+:root[data-writing="vertical"] .web-embed,
 :root[data-writing="vertical"] figure {
   writing-mode: horizontal-tb;
   width: fit-content;
@@ -655,6 +701,13 @@ details:not(.callout):not(.properties) > summary { cursor: pointer; }
   overflow: auto;
 }
 :root[data-writing="vertical"] figure { overflow: visible; }
+/* 縦書きでは幅を決めないと縦横比が効かないので、段の高さに収まる幅にする */
+:root[data-writing="vertical"] .web-embed {
+  width: min(var(--embed-width, 640px), var(--island-max, min(70vw, 46em)));
+  max-height: calc(100vh - 6em);
+  margin: 0 1.5em;
+  overflow: hidden;
+}
 :root[data-writing="vertical"] figure img { max-height: calc(100vh - 10em); max-width: var(--island-max, min(70vw, 46em)); }
 :root[data-writing="vertical"] .diagram svg { max-height: calc(100vh - 7em); }
 :root[data-writing="vertical"] .code-block pre { max-height: calc(100vh - 7em); padding-inline-end: 5em; }
@@ -705,17 +758,18 @@ details:not(.callout):not(.properties) > summary { cursor: pointer; }
 }
 
 /* 段の途中で切りたくないもの */
-:root[data-paged="on"] #content :is(figure, img, .math-block, .diagram, .callout-title, tr, .properties) { break-inside: avoid; }
+:root[data-paged="on"] #content :is(figure, img, .math-block, .diagram, .callout-title, tr, .properties, .web-embed) { break-inside: avoid; }
 :root[data-paged="on"] #content :is(h1, h2, h3, h4, h5, h6) { break-after: avoid; break-inside: avoid; }
 
 /* 段より大きいものは段に収める */
 :root[data-paged="on"] #content img { max-width: var(--col-w); max-height: var(--col-h); object-fit: contain; }
 :root[data-paged="on"] #content figure img { max-height: calc(var(--col-h) - 3em); }
 :root[data-paged="on"] #content :is(.code-block pre, .table-wrap, .math-block, .diagram) { max-height: var(--col-h); overflow: auto; }
+:root[data-paged="on"] #content .web-embed { max-width: var(--col-w); max-height: var(--col-h); }
 :root[data-paged="on"] #content .diagram svg { max-height: var(--col-h); }
 
 /* 縦書きの島（横組みのまま置く要素）は、段の大きさに合わせる */
-:root[data-paged="on"][data-writing="vertical"] #content :is(.code-block, .table-wrap, .math-block, .diagram, .properties, .toc, figure) {
+:root[data-paged="on"][data-writing="vertical"] #content :is(.code-block, .table-wrap, .math-block, .diagram, .properties, .toc, figure, .web-embed) {
   max-width: var(--col-w);
   max-height: var(--col-h);
   margin: 0 1em;

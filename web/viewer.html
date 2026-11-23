@@ -5,8 +5,9 @@
 <!--
   任意の md を開くアプリなので、本文に紛れた <script> や外部通信は CSP で止める。
   スクリプトは同梱ファイルのみ。画像は外部とローカルを許可する。
+  frame-src は許可した埋め込みの提供元だけ（src/embed.js の EMBED_PROVIDERS と同じにする）。
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' shiori-file: https:; img-src 'self' shiori-file: https: http: data: blob:; media-src 'self' shiori-file: https: http:; font-src 'self' shiori-file: https: data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' shiori-file: https:; img-src 'self' shiori-file: https: http: data: blob:; media-src 'self' shiori-file: https: http:; font-src 'self' shiori-file: https: data:; connect-src 'none'; frame-src https://www.google.com https://maps.google.com https://www.openstreetmap.org https://player.vimeo.com https://calendar.google.com https://docs.google.com; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Shiori</title>
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" id="theme-link" href="themes/default.css">

@@ -80,6 +80,13 @@ test('値が空の項目はプロパティに出さない', () => {
   assert.doesNotMatch(html('---\nauthor:\n---\n本文'), /properties/);
 });
 
+test('iframe のブロックには行番号を付け、他の生 HTML はそのまま', () => {
+  const out = html('前\n\n<iframe src="https://www.google.com/maps/embed?pb=1"></iframe>\n\n<details>\n<summary>x</summary>\n</details>\n');
+  assert.match(out, /<div class="html-block" data-line="2" data-line-end="3">\n<iframe/);
+  assert.match(out, /\n<details>/);
+  assert.doesNotMatch(out, /html-block"[^>]*>\n<details/);
+});
+
 test('壊れた YAML でも本文を失わない', () => {
   const fm = splitFrontMatter('---\nfoo: [\n---\n本文');
   assert.equal(fm.data, null);

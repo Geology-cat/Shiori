@@ -88,6 +88,7 @@ Markdown の解析は Swift ではなく WKWebView 内の markdown-it で行う�
 - `viewer.html` の CSP で、同梱以外のスクリプトと外部通信を止めている
 - `sanitize.js` の DOMPurify で生 HTML を無害化する
 - `shiori-file://` は画像・動画・フォントの拡張子だけを配信する（`ShioriSchemeHandler`）
+- iframe は `web/src/embed.js` の許可リストにある提供元だけ、クリックしてから読み込む。提供元を足すときは CSP の `frame-src` も同じにする（`test/embed.test.mjs` が照合する）
 - リンクは JS で受けて Swift に渡す。WebView 自身は遷移させない
 
 ### App Sandbox は使わない

@@ -101,6 +101,8 @@ final class AppSettings: ObservableObject {
     @Published var breaks: Bool { didSet { defaults.set(breaks, forKey: Keys.breaks) } }
     @Published var showProperties: Bool { didSet { defaults.set(showProperties, forKey: Keys.showProperties) } }
     @Published var clickToPage: Bool { didSet { defaults.set(clickToPage, forKey: Keys.clickToPage) } }
+    /// 外部の埋め込み（Google マップなど）を、クリックを待たずに読み込む
+    @Published var autoloadEmbeds: Bool { didSet { defaults.set(autoloadEmbeds, forKey: Keys.autoloadEmbeds) } }
     @Published var useCustomCSS: Bool { didSet { defaults.set(useCustomCSS, forKey: Keys.useCustomCSS) } }
 
     // エディタ
@@ -124,6 +126,7 @@ final class AppSettings: ObservableObject {
         static let breaks = "breaks"
         static let showProperties = "showProperties"
         static let clickToPage = "clickToPage"
+        static let autoloadEmbeds = "autoloadEmbeds"
         static let useCustomCSS = "useCustomCSS"
         static let editorFontSize = "editorFontSize"
         static let editorFontName = "editorFontName"
@@ -157,6 +160,7 @@ final class AppSettings: ObservableObject {
         breaks = d.bool(forKey: Keys.breaks)
         showProperties = d.bool(forKey: Keys.showProperties)
         clickToPage = d.bool(forKey: Keys.clickToPage)
+        autoloadEmbeds = d.bool(forKey: Keys.autoloadEmbeds)
         useCustomCSS = d.bool(forKey: Keys.useCustomCSS)
         editorFontSize = d.double(forKey: Keys.editorFontSize)
         editorFontName = d.string(forKey: Keys.editorFontName) ?? ""
