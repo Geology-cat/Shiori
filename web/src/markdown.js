@@ -172,6 +172,23 @@ const TITLE_KEYS = ['title', 'タイトル'];
 const AUTHOR_KEYS = ['author', 'authors', '著者'];
 const DATE_KEYS = ['date', '日付'];
 const ABSTRACT_KEYS = ['abstract', '概要', '要旨'];
+const TAG_KEYS = ['tags', 'tag', 'タグ'];
+
+/** tags の値をタグ名の配列にする。配列でも「a, b」「#a #b」のような文字列でも受ける */
+export function normalizeTags(value) {
+  const items = Array.isArray(value) ? value : value == null ? [] : String(value).split(/[,、\s]+/);
+  const out = [];
+  for (const item of items) {
+    if (item == null || typeof item === 'object') continue;
+    const name = String(item).trim().replace(/^#+/, '');
+    if (name && !out.includes(name)) out.push(name);
+  }
+  return out;
+}
+
+function tagsHtml(tags) {
+  return `<p class="doc-tags">${tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join(' ')}</p>`;
+}
 
 function pick(data, keys) {
   for (const k of keys) if (data[k] != null && data[k] !== '') return { key: k, value: data[k] };
@@ -212,9 +229,19 @@ export function renderFrontMatter(fm, { showProperties = true } = {}) {
     used.clear();
   }
 
+  // タグは表題の有無にかかわらず本文の前に並べる（プロパティ一覧には重ねて出さない）
+  const tagHit = pick(fm.data, TAG_KEYS);
+  const tags = tagHit ? normalizeTags(tagHit.value) : [];
+  if (tags.length) {
+    used.add(tagHit.key);
+    const block = tagsHtml(tags);
+    html = title != null ? html.replace(/<\/header>\n$/, `${block}</header>\n`) : html + block + '\n';
+  }
+
   if (showProperties) {
     const rows = Object.entries(fm.data)
-      .filter(([k]) => !used.has(k))
+      // ひな形で入れたまま値を書いていない項目は出さない
+      .filter(([k, v]) => !used.has(k) && formatValue(v) !== '')
       .map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(formatValue(v))}</td></tr>`)
       .join('');
     if (rows) {

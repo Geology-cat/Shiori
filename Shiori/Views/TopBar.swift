@@ -301,34 +301,64 @@ struct FormatBar: View {
     @State private var showingTable = false
 
     var body: some View {
+        // 狭いウインドウでは横にスクロールして全部のボタンに届くようにする
+        ScrollView(.horizontal, showsIndicators: false) {
+            buttons.padding(.horizontal, 10)
+        }
+        .frame(height: 30)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var buttons: some View {
         HStack(spacing: 1) {
-            Menu {
+            BarMenu(systemName: "number", help: "見出し") {
                 ForEach(1...6, id: \.self) { level in
                     Button("見出し \(level)") { editor.setHeading(level: level) }
                 }
                 Divider()
                 Button("本文に戻す") { editor.setHeading(level: 0) }
-            } label: {
-                Image(systemName: "number")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .frame(width: 26, height: 24)
-            .help("見出し")
+            separator
 
             IconButton(systemName: "bold", help: "太字 (⌘B)") { editor.toggleWrap(prefix: "**", suffix: "**", placeholder: "太字") }
             IconButton(systemName: "italic", help: "斜体 (⌘I)") { editor.toggleWrap(prefix: "*", suffix: "*", placeholder: "斜体") }
             IconButton(systemName: "strikethrough", help: "取り消し線") { editor.toggleWrap(prefix: "~~", suffix: "~~", placeholder: "取り消し線") }
             IconButton(systemName: "highlighter", help: "マーカー") { editor.toggleWrap(prefix: "==", suffix: "==", placeholder: "マーカー") }
+            BarMenu(systemName: "textformat", help: "その他の文字装飾") {
+                Button("下線（++追加++）") { editor.toggleWrap(prefix: "++", suffix: "++", placeholder: "追加") }
+                Button("上付き（x^2^）") { editor.toggleWrap(prefix: "^", suffix: "^", placeholder: "2") }
+                Button("下付き（H~2~O）") { editor.toggleWrap(prefix: "~", suffix: "~", placeholder: "2") }
+                Button("キー（<kbd>）") { editor.toggleWrap(prefix: "<kbd>", suffix: "</kbd>", placeholder: "⌘") }
+                Divider()
+                Button("ルビ（｜漢字《かんじ》）") { editor.insertRuby() }
+                Button("傍点（《《傍点》》）") { editor.toggleWrap(prefix: "《《", suffix: "》》", placeholder: "傍点") }
+                Divider()
+                Button("タグ（#タグ）") { editor.toggleWrap(prefix: "#", suffix: "", placeholder: "タグ") }
+                Button("コメント（%%非表示%%）") { editor.toggleWrap(prefix: "%%", suffix: "%%", placeholder: "コメント") }
+                Button("今日の日付") { editor.insertToday() }
+            }
             separator
+
             IconButton(systemName: "link", help: "リンク (⌘K)") { editor.toggleWrap(prefix: "[", suffix: "](url)", placeholder: "リンク") }
+            IconButton(systemName: "link.badge.plus", help: "内部リンク（[[ファイル名]]）") { editor.toggleWrap(prefix: "[[", suffix: "]]", placeholder: "ファイル名") }
             IconButton(systemName: "photo", help: "画像") { editor.toggleWrap(prefix: "![", suffix: "](path)", placeholder: "説明") }
             IconButton(systemName: "chevron.left.forwardslash.chevron.right", help: "インラインコード") { editor.toggleWrap(prefix: "`", suffix: "`", placeholder: "code") }
-            IconButton(systemName: "curlybraces", help: "コードブロック") { editor.insertBlock("```\n\n```", cursorOffset: 4) }
-            IconButton(systemName: "function", help: "数式") { editor.toggleWrap(prefix: "$", suffix: "$", placeholder: "x^2") }
+            BarMenu(systemName: "curlybraces", help: "コードブロック") {
+                Button("コードブロック") { editor.insertCodeBlock() }
+                Divider()
+                ForEach(Self.languages, id: \.self) { language in
+                    Button(language) { editor.insertCodeBlock(language: language) }
+                }
+                Divider()
+                Button("Mermaid の図") { editor.insertBlock("```mermaid\nflowchart LR\n    A[開始] --> B[終了]\n```") }
+            }
+            BarMenu(systemName: "function", help: "数式") {
+                Button("文中の数式（$…$）") { editor.toggleWrap(prefix: "$", suffix: "$", placeholder: "x^2") }
+                Button("数式ブロック（$$…$$）") { editor.insertBlock("$$\n\n$$", cursorOffset: 3) }
+                Button("化学式（$\\ce{…}$）") { editor.toggleWrap(prefix: "$\\ce{", suffix: "}$", placeholder: "H2O") }
+            }
             separator
+
             IconButton(systemName: "list.bullet", help: "箇条書き") { editor.toggleLinePrefix("- ") }
             IconButton(systemName: "list.number", help: "番号付きリスト") { editor.toggleLinePrefix("1. ") }
             IconButton(systemName: "checklist", help: "タスク") { editor.toggleLinePrefix("- [ ] ") }
@@ -338,18 +368,74 @@ struct FormatBar: View {
                     TableInsertView(editor: editor, isPresented: $showingTable)
                 }
             IconButton(systemName: "minus", help: "水平線") { editor.insertBlock("---") }
-            Spacer()
+            separator
+
+            BarMenu(systemName: "exclamationmark.bubble", help: "注記（コールアウト）") {
+                ForEach(Self.callouts, id: \.kind) { callout in
+                    Button(callout.label) { editor.insertCallout(kind: callout.kind) }
+                }
+                Divider()
+                Button("折りたたみの注記") { editor.insertCallout(kind: "note", foldable: true) }
+                Button("折りたたみ（<details>）") {
+                    let head = "<details>\n<summary>見出し</summary>\n\n"
+                    editor.insertBlock(head + "\n\n</details>", cursorOffset: (head as NSString).length)
+                }
+            }
+            BarMenu(systemName: "plus.square", help: "挿入") {
+                Button("脚注") { editor.insertFootnote() }
+                Button("定義リスト") { editor.insertBlock("用語\n: 説明", cursorOffset: 0) }
+                Button("目次（[[toc]]）") { editor.insertBlock("[[toc]]") }
+            }
+            BarMenu(systemName: "list.bullet.rectangle", help: "フロントマター（YAML）") {
+                Section("ひな形") {
+                    ForEach(MarkdownEditing.FrontMatterTemplate.allCases) { template in
+                        Button(template.label) { editor.insertFrontMatter(template: template) }
+                    }
+                }
+                Section("項目を追加") {
+                    ForEach(MarkdownEditing.FrontMatterField.allCases) { field in
+                        Button(field.label) { editor.insertFrontMatter(field: field) }
+                    }
+                }
+            }
         }
-        .padding(.horizontal, 10)
         .frame(height: 30)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
+
+    private static let languages = ["python", "swift", "javascript", "typescript", "bash", "json", "yaml", "html", "css", "sql", "r", "diff"]
+
+    private static let callouts: [(kind: String, label: String)] = [
+        ("NOTE", "メモ（NOTE）"), ("TIP", "ヒント（TIP）"), ("IMPORTANT", "重要（IMPORTANT）"),
+        ("WARNING", "注意（WARNING）"), ("CAUTION", "警告（CAUTION）"),
+        ("example", "例（example）"), ("question", "質問（question）"), ("quote", "引用（quote）"),
+    ]
 
     private var separator: some View {
         Rectangle()
             .fill(Color(nsColor: .separatorColor))
             .frame(width: 1, height: 14)
             .padding(.horizontal, 5)
+    }
+}
+
+/// 書式バーのメニューボタン（アイコンだけ）
+private struct BarMenu<Content: View>: View {
+    let systemName: String
+    let help: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        Menu {
+            content()
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(width: 26, height: 24)
+        .help(help)
     }
 }
 

@@ -445,6 +445,101 @@ final class EditorController: NSObject, NSTextViewDelegate {
         textView.window?.makeFirstResponder(textView)
     }
 
+    // MARK: - 定型文
+
+    /// 編集を順に適用し、最後の編集のカーソル位置へ移る（同じ操作の中なので取り消しは 1 回で戻る）
+    private func apply(_ edits: [MarkdownEditing.TextEdit]) {
+        guard let last = edits.last else { return }
+        for edit in edits { textView.replace(range: edit.range, with: edit.replacement) }
+        let cursor = NSRange(location: min(last.cursor, (textView.string as NSString).length), length: 0)
+        textView.setSelectedRange(cursor)
+        textView.scrollRangeToVisible(cursor)
+    }
+
+    private var frontMatterContext: MarkdownEditing.FrontMatterContext {
+        .current(title: currentTab?.url?.deletingPathExtension().lastPathComponent ?? "")
+    }
+
+    func insertFrontMatter(template: MarkdownEditing.FrontMatterTemplate) {
+        insertFrontMatter(template.entries(frontMatterContext))
+    }
+
+    func insertFrontMatter(field: MarkdownEditing.FrontMatterField) {
+        insertFrontMatter([field.entry(frontMatterContext)])
+    }
+
+    /// フロントマターを作る。すでにあれば足りない項目だけ足す
+    private func insertFrontMatter(_ entries: [MarkdownEditing.FrontMatterEntry]) {
+        focus()
+        switch MarkdownEditing.mergeFrontMatter(entries, into: textView.string) {
+        case .edit(let edit):
+            apply([edit])
+        case .nothingToAdd:
+            NSSound.beep()
+        case .unsupported:
+            let alert = NSAlert()
+            alert.messageText = "TOML のフロントマターには追加できません"
+            alert.informativeText = "この文書のフロントマターは +++ で囲んだ TOML 形式です。YAML の項目は手で書き足してください。"
+            alert.runModal()
+        }
+    }
+
+    /// 脚注の参照をカーソル位置に入れ、文末に定義を作る
+    func insertFootnote() {
+        focus()
+        let selection = textView.selectedRange()
+        apply(MarkdownEditing.insertFootnote(in: textView.string, at: NSMaxRange(selection)))
+    }
+
+    /// 選択した行を注記で囲む
+    func insertCallout(kind: String, foldable: Bool = false) {
+        focus()
+        let ns = textView.string as NSString
+        var selection = textView.selectedRange()
+        var body = ""
+        if selection.length > 0 {
+            // 行の途中から選んでいても行ごと囲む
+            var lines = ns.lineRange(for: selection)
+            if NSMaxRange(lines) > lines.location, ns.substring(with: NSRange(location: NSMaxRange(lines) - 1, length: 1)) == "\n" {
+                lines.length -= 1
+            }
+            selection = lines
+            body = ns.substring(with: lines)
+            textView.setSelectedRange(selection)
+        }
+        let block = MarkdownEditing.callout(kind: kind, foldable: foldable, body: body)
+        // 空の注記は本文の位置へ、中身があれば注記の後ろへ
+        insertBlock(block, cursorOffset: (block as NSString).length)
+    }
+
+    /// 選択をコードブロックで囲む
+    func insertCodeBlock(language: String = "") {
+        focus()
+        let ns = textView.string as NSString
+        let body = ns.substring(with: textView.selectedRange())
+        let block = MarkdownEditing.codeBlock(language: language, body: body)
+        insertBlock(block.text, cursorOffset: block.cursorOffset)
+    }
+
+    /// 選択（なければ仮の文字）にルビを振り、読みを入力できるようにする
+    func insertRuby() {
+        focus()
+        let ns = textView.string as NSString
+        let selection = textView.selectedRange()
+        let base = selection.length > 0 ? ns.substring(with: selection) : "漢字"
+        let text = "｜\(base)《よみ》"
+        textView.replace(range: selection, with: text)
+        // 「よみ」を選んだ状態にする
+        let readingStart = selection.location + ("｜\(base)《" as NSString).length
+        textView.setSelectedRange(NSRange(location: readingStart, length: 2))
+    }
+
+    /// 今日の日付を入れる
+    func insertToday() {
+        focus()
+        textView.insertText(frontMatterContext.today, replacementRange: textView.selectedRange())
+    }
+
     // MARK: - 画像
 
     /// 貼り付けられた画像を文書のそばに保存してリンクを挿入する

@@ -1,7 +1,7 @@
 // レンダラの単体テスト（node --test test/）
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderMarkdown, parseFenceInfo, splitFrontMatter } from '../src/markdown.js';
+import { renderMarkdown, parseFenceInfo, splitFrontMatter, normalizeTags } from '../src/markdown.js';
 
 const html = (src, opts) => renderMarkdown(src, opts).html;
 
@@ -51,9 +51,33 @@ test('フロントマターがあっても行番号がソース基準', () => {
   const out = html('---\ntitle: 表題\nauthor: 著者\ntags: [a, b]\n---\n\n本文\n\n- [ ] 未\n');
   assert.match(out, /class="doc-title">表題/);
   assert.match(out, /class="doc-author">著者/);
-  assert.match(out, /<th>tags<\/th><td>a, b<\/td>/);
+  assert.match(out, /<p class="doc-tags"><span class="tag">#a<\/span> <span class="tag">#b<\/span><\/p><\/header>/);
+  assert.doesNotMatch(out, /<th>tags<\/th>/);
   assert.match(out, /<p data-line="6" data-line-end="7">本文/);
   assert.match(out, /data-task-line="8"/);
+});
+
+test('フロントマターのタグは表題がなくても表示する', () => {
+  const out = html('---\ntags:\n  - 地質\n  - "#野外調査"\ndate: 2026-01-01\n---\n本文\n');
+  assert.match(out, /^<p class="doc-tags"><span class="tag">#地質<\/span> <span class="tag">#野外調査<\/span><\/p>/);
+  assert.match(out, /<th>date<\/th>/);
+  assert.doesNotMatch(out, /<th>tags<\/th>/);
+});
+
+test('タグの書き方のゆれを吸収する', () => {
+  assert.deepEqual(normalizeTags('a, b #c'), ['a', 'b', 'c']);
+  assert.deepEqual(normalizeTags(['x', 'x', 1, null, { y: 1 }]), ['x', '1']);
+  assert.deepEqual(normalizeTags(null), []);
+  // プロパティを隠していてもタグは出す
+  assert.match(renderMarkdown('---\ntag: 日記\n---\n本文', { showProperties: false }).html, /#日記/);
+});
+
+test('値が空の項目はプロパティに出さない', () => {
+  const out = html('---\ntitle: 表題\nauthor:\nabstract: ""\ntags:\n  -\nmemo: あり\n---\n本文');
+  assert.doesNotMatch(out, /<th>(author|abstract|tags)<\/th>/);
+  assert.doesNotMatch(out, /doc-tags/);
+  assert.match(out, /<th>memo<\/th>/);
+  assert.doesNotMatch(html('---\nauthor:\n---\n本文'), /properties/);
 });
 
 test('壊れた YAML でも本文を失わない', () => {

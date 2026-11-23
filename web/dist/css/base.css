@@ -222,6 +222,9 @@ h6 { font-size: 0.86em; color: var(--muted); }
 .doc-header { margin-block-end: 2.2em; }
 .doc-title { margin-block: 0 0.4em; font-size: 1.9em; }
 .doc-author, .doc-date { margin-block: 0; color: var(--muted); font-size: 0.95em; }
+/* フロントマターの tags。表題があれば表題ブロックの中、なければ本文の前に置く */
+.doc-tags { margin-block: 0 1.6em; display: flex; flex-wrap: wrap; gap: 0.4em; line-height: 1.6; }
+.doc-header .doc-tags { margin-block: 0.7em 0; }
 .doc-abstract {
   margin-block: 1.4em 0;
   padding-inline: 1.5em;
